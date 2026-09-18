@@ -64,7 +64,7 @@
 			android:summary="@string/preference_keyboard_skin_summary"
 			android:entries="@array/keyboard_skin"
 			android:entryValues="@array/keyboard_skin_id"
-			android:defaultValue="white" />
+			android:defaultValue="@string/keyboard_skin_id_default" />
 	</PreferenceCategory>
 
 </PreferenceScreen>

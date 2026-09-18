@@ -839,10 +839,9 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 		createKeyboards(parent);
 
 		final SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(parent);
-		String skin = pref.getString("keyboard_skin",
-				mIME.getResources().getString(R.string.keyboard_skin_id_default));
-		int id = parent.getResources().getIdentifier("keyboard_" + skin, "layout", parent.getPackageName());
-		if (id == 0) id = R.layout.keyboard_white;
+		KeyboardTheme theme = KeyboardTheme.resolve(parent);
+		String skin = theme.getSkinId();
+		int id = theme.getLayoutResource();
 		mKeyboardView = (KeyboardView) mIME.getLayoutInflater().inflate(id, null);
 		mKeyboardView.setOnKeyboardActionListener(this);
 		mCurrentKeyboard = null;
@@ -853,17 +852,27 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 
 		mNumKeyboardView = (KeyboardView) mIME.getLayoutInflater().inflate(id, null);
 		mNumKeyboardView.setOnKeyboardActionListener(this);
+		if (mNumKeyboardView instanceof DefaultSoftKeyboardView) {
+			((DefaultSoftKeyboardView) mNumKeyboardView)
+					.setKeyboardDisplay(mKeyboardDisplays.get(skin));
+		}
 
 		mMainView =
 				(ViewGroup)
 						parent.getLayoutInflater().inflate(R.layout.keyboard_default_main, null);
 		mSubView =
 				(ViewGroup) parent.getLayoutInflater().inflate(R.layout.keyboard_default_sub, null);
+		mMainView.setBackgroundColor(theme.getBackgroundColor(parent));
+		mSubView.setBackgroundColor(theme.getBackgroundColor(parent));
+		((TextView) mSubView.findViewById(R.id.lang)).setTextColor(theme.getTextColor());
 
 		boolean initialLaunch = pref.getBoolean("initial_launch", true);
 		if (initialLaunch) {
 			final View help =
 					parent.getLayoutInflater().inflate(R.layout.initial_launch_helper, null);
+			help.setBackgroundColor(theme.getBackgroundColor(parent));
+			((TextView) help.findViewById(R.id.initial_launch_help))
+					.setTextColor(theme.getTextColor());
 			mMainView.addView(help);
 			Button close = (Button) mMainView.findViewById(R.id.close);
 			close.setOnClickListener(
@@ -1302,9 +1311,7 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 	@SuppressWarnings("deprecation")
 	public Keyboard loadKeyboardLayout(Context context, int xmlLayoutResId) {
 		CustomKeyboard keyboard = new CustomKeyboard(context, xmlLayoutResId);
-		SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(mIME);
-		String skin = pref.getString("keyboard_skin",
-				mIME.getResources().getString(R.string.keyboard_skin_id_default));
+		String skin = KeyboardTheme.resolve(mIME).getSkinId();
 		DisplayMetrics metrics = mIME.getResources().getDisplayMetrics();
 		int height = (mDisplayMode == PORTRAIT) ? mKeyHeightPortrait : mKeyHeightLandscape;
 		height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, height, metrics);

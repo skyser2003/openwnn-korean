@@ -17,15 +17,17 @@
 <resources>
 
     <string-array name="keyboard_skin">
+        <item>@string/preference_keyboard_system</item>
         <item>@string/preference_keyboard_white</item>
         <item>@string/preference_keyboard_dark</item>
 		<item>@string/preference_keyboard_flat_dark</item>
         <item>@string/preference_keyboard_flat_blue</item>
     </string-array>
 
-    <string name="keyboard_skin_id_default">white</string>
+    <string name="keyboard_skin_id_default" translatable="false">system</string>
 
     <string-array name="keyboard_skin_id">
+        <item>system</item>
         <item>white</item>
         <item>dark</item>
 		<item>flat_dark</item>

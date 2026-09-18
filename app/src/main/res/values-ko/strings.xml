@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="preference_keyboard_system">시스템 설정 따르기</string>
     <!-- common part -->
 
     <string name="app_name">세벌식 한글 입력기</string>

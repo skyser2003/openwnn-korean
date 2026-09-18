@@ -1,14 +1,12 @@
 package me.blog.hgl1002.openwnn;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.inputmethodservice.InputMethodService;
-import android.inputmethodservice.KeyboardView;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -16,7 +14,6 @@ import android.os.Looper;
 import android.text.method.MetaKeyKeyListener;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.WindowInsets;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
@@ -41,6 +38,7 @@ import me.blog.hgl1002.openwnn.hangul.HangulEngine.HangulEngineListener;
 import me.blog.hgl1002.openwnn.hangul.HangulEngine.SetComposingEvent;
 import me.blog.hgl1002.openwnn.hangul.TwelveHangulEngine;
 import me.blog.hgl1002.openwnn.view.DefaultSoftKeyboard;
+import me.blog.hgl1002.openwnn.view.KeyboardTheme;
 import me.blog.hgl1002.openwnn.view.ListLangKeyActionDialogActivity;
 
 import org.greenrobot.eventbus.EventBus;
@@ -276,14 +274,14 @@ public class SebeolHangulIME extends InputMethodService
 			mPreparedInputView =
 					mInputViewManager.initView(this, metrics.widthPixels, metrics.heightPixels);
 		}
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) updateNavigationBar();
+		updateNavigationBar();
 		return mPreparedInputView;
 	}
 
 	@Override
 	public void onWindowShown() {
 		super.onWindowShown();
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) updateNavigationBar();
+		updateNavigationBar();
 	}
 
 	@Override
@@ -1052,22 +1050,9 @@ public class SebeolHangulIME extends InputMethodService
 		outInsets.contentTopInsets = outInsets.visibleTopInsets;
 	}
 
-	@TargetApi(Build.VERSION_CODES.R)
-    private void updateNavigationBar() {
-		// Create a keyboard view to get background color
-		SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
-		String skin = pref.getString("keyboard_skin", getResources().getString(R.string.keyboard_skin_id_default));
-		int id = getResources().getIdentifier("keyboard_" + skin, "layout", getPackageName());
-		if(id == 0) id = R.layout.keyboard_white;
-		KeyboardView keyboardView = (KeyboardView) getLayoutInflater().inflate(id, null);
-
-		getWindow().getWindow().getDecorView().setOnApplyWindowInsetsListener((view, insets) -> {
-			android.graphics.Insets statusBarInsets = insets.getInsets(WindowInsets.Type.statusBars());
-			android.graphics.Insets navInsets = insets.getInsets(WindowInsets.Type.navigationBars());
-			view.setBackground(keyboardView.getBackground());
-			view.setPadding(0, statusBarInsets.top, 0, navInsets.bottom);
-			return insets;
-		});
+	private void updateNavigationBar() {
+		KeyboardTheme.resolve(this)
+				.applyToWindow(this, getWindow().getWindow(), mPreparedInputView);
 	}
 
 	@Override
