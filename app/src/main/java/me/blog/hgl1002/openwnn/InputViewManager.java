@@ -16,8 +16,8 @@
 
 package me.blog.hgl1002.openwnn;
 
-import android.view.View;
 import android.content.SharedPreferences;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 
 /**
@@ -59,8 +59,9 @@ public interface InputViewManager {
      */
     void setPreferences(SharedPreferences pref, EditorInfo editor);
 
-    /**
-     * Close the input view.
-     */
+    /** Resume touch input when the input view is shown, including in the same editor session. */
+    void startInputView();
+
+    /** Close the input view. */
     void closing();
 }

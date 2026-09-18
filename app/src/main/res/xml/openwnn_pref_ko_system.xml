@@ -2,6 +2,11 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
 			android:key="openwnn_pref_ko">
 	<PreferenceCategory android:title="@string/preference_system_setting_menu">
+        <ListPreference android:key="app_language"
+            android:title="@string/preference_app_language_title"
+            android:entries="@array/app_languages"
+            android:entryValues="@array/app_language_values"
+            android:defaultValue="system" />
 		<CheckBoxPreference android:key="system_use_standard_jamo"
 			android:title="@string/preference_system_use_standard_jamo_title"
 			android:summary="@string/preference_system_use_standard_jamo_summary"

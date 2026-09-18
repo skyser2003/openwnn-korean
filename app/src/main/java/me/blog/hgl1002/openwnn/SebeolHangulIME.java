@@ -6,39 +6,22 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.KeyboardView;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.text.method.MetaKeyKeyListener;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowInsets;
-import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 
 import androidx.preference.PreferenceManager;
-
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-
-import me.blog.hgl1002.openwnn.view.DefaultSoftKeyboard;
-import me.blog.hgl1002.openwnn.hangul.EngineMode;
-import me.blog.hgl1002.openwnn.hangul.HangulEngine;
-import me.blog.hgl1002.openwnn.hangul.HangulEngine.FinishComposingEvent;
-import me.blog.hgl1002.openwnn.hangul.HangulEngine.HangulEngineEvent;
-import me.blog.hgl1002.openwnn.hangul.HangulEngine.HangulEngineListener;
-import me.blog.hgl1002.openwnn.hangul.HangulEngine.SetComposingEvent;
-import me.blog.hgl1002.openwnn.preference.KeystrokePreference;
-import me.blog.hgl1002.openwnn.view.ListLangKeyActionDialogActivity;
-import me.blog.hgl1002.openwnn.hangul.TwelveHangulEngine;
 
 import me.blog.hgl1002.openwnn.event.CommitComposingTextEvent;
 import me.blog.hgl1002.openwnn.event.EngineModeChangeEvent;
@@ -47,12 +30,31 @@ import me.blog.hgl1002.openwnn.event.InputKeyEvent;
 import me.blog.hgl1002.openwnn.event.InputSoftKeyEvent;
 import me.blog.hgl1002.openwnn.event.InputTimeoutEvent;
 import me.blog.hgl1002.openwnn.event.InputViewChangeEvent;
-import me.blog.hgl1002.openwnn.event.KeyUpEvent;
 import me.blog.hgl1002.openwnn.event.SoftKeyFlickEvent;
 import me.blog.hgl1002.openwnn.event.SoftKeyGestureEvent;
 import me.blog.hgl1002.openwnn.event.SoftKeyLongPressEvent;
+import me.blog.hgl1002.openwnn.hangul.EngineMode;
+import me.blog.hgl1002.openwnn.hangul.HangulEngine;
+import me.blog.hgl1002.openwnn.hangul.HangulEngine.FinishComposingEvent;
+import me.blog.hgl1002.openwnn.hangul.HangulEngine.HangulEngineEvent;
+import me.blog.hgl1002.openwnn.hangul.HangulEngine.HangulEngineListener;
+import me.blog.hgl1002.openwnn.hangul.HangulEngine.SetComposingEvent;
+import me.blog.hgl1002.openwnn.hangul.TwelveHangulEngine;
+import me.blog.hgl1002.openwnn.view.DefaultSoftKeyboard;
+import me.blog.hgl1002.openwnn.view.ListLangKeyActionDialogActivity;
 
-public class SebeolHangulIME extends InputMethodService implements HangulEngineListener {
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+
+import java.lang.ref.WeakReference;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+public class SebeolHangulIME extends InputMethodService
+		implements HangulEngineListener,
+				SharedPreferences.OnSharedPreferenceChangeListener,
+				HardwareKeyHandler.Listener {
 
 	/** Input view (software keyboard) */
 	protected InputViewManager  mInputViewManager = null;
@@ -60,8 +62,16 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 	protected InputConnection mInputConnection = null;
 	/** Auto hide candidate view */
 	protected boolean mAutoHideMode = true;
-	/** Flag for checking if the previous down key event is consumed by OpenWnn  */
-	private boolean mConsumeDownEvent;
+
+	private View mPreparedInputView;
+	private Resources mLocalizedResources;
+	private SharedPreferences mPreferences;
+	private final Handler mSettingsHandler = new Handler(Looper.getMainLooper());
+	private final HardwareKeyHandler mHardwareKeys = new HardwareKeyHandler(this);
+	private final Runnable mRefreshSettings = this::refreshSettings;
+	private boolean mHideHardwareKeyboard;
+	private boolean mKeyboardSuppressed;
+	private boolean mRefreshingSettings;
 
 	public static final int[][] SHIFT_CONVERT = {
 			{0x60, 0x7e},
@@ -169,16 +179,14 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 
 	Handler mTimeOutHandler;
 
-	KeystrokePreference.KeyStroke mHardLangKey;
+	private static WeakReference<SebeolHangulIME> mSelf = new WeakReference<>(null);
 
-	private static SebeolHangulIME mSelf;
 	public static SebeolHangulIME getInstance() {
-		return mSelf;
+		return mSelf.get();
 	}
 
 	public SebeolHangulIME() {
 		super();
-		mSelf = this;
 		mInputViewManager = new DefaultSoftKeyboard(this);
 
 		mQwertyEngine = new HangulEngine();
@@ -193,109 +201,172 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 
 	}
 
-	public SebeolHangulIME(Context context) {
-		this();
-		attachBaseContext(context);
-	}
-
 	@Override
 	public void onCreate() {
 		super.onCreate();
+		mSelf = new WeakReference<>(this);
+		mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		mLocalizedResources = AppLanguage.resources(this, super.getResources());
+		mPreferences.registerOnSharedPreferenceChangeListener(this);
 		EventBus.getDefault().register(this);
+		loadPreferences();
+	}
+
+	@Override
+	public Resources getResources() {
+		return mLocalizedResources == null ? super.getResources() : mLocalizedResources;
+	}
+
+	public boolean hasHardwareKeyboard() {
+		Configuration config = getResources().getConfiguration();
+		return config.keyboard == Configuration.KEYBOARD_QWERTY
+				&& config.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO;
+	}
+
+	private boolean shouldHideKeyboard() {
+		return mHideHardwareKeyboard && hasHardwareKeyboard();
+	}
+
+	private void loadPreferences() {
+		SharedPreferences pref = mPreferences;
+		if (pref == null) return;
+		((DefaultSoftKeyboard) mInputViewManager).setHardKeyboardHidden(!hasHardwareKeyboard());
+		mHideHardwareKeyboard = pref.getBoolean("hardware_hide_keyboard", false);
+		mHardwareKeys.configure(pref);
+		mAltLayout =
+				EngineMode.get(pref.getString("keyboard_symbols_layout", "keyboard_symbols_a"))
+						.layout;
+		mMoachigi = pref.getBoolean("keyboard_use_moachigi", false);
+		mHardwareMoachigi = pref.getBoolean("hardware_use_moachigi", true);
+		mFullMoachigi = pref.getBoolean("hardware_full_moachigi", true);
+		mMoachigiDelay = pref.getInt("hardware_full_moachigi_delay", 100);
+		mQuickPeriod = pref.getBoolean("keyboard_quick_period", false);
+		mSpaceResetJohab = pref.getBoolean("keyboard_space_reset_composing", true);
+		mStandardJamo = pref.getBoolean("system_use_standard_jamo", false);
+		mLangKeyAction = pref.getString("system_action_on_lang_key_press", LANGKEY_SWITCH_KOR_ENG);
+		mLangKeyLongAction =
+				pref.getString("system_action_on_lang_key_long_press", LANGKEY_LIST_METHODS);
+		mAltKeyLongAction =
+				pref.getString("system_action_on_alt_key_long_press", LANGKEY_LIST_ACTIONS);
+		flickAction.put(
+				SoftKeyFlickEvent.Direction.UP,
+				pref.getString("keyboard_action_on_flick_up", FLICK_SHIFT));
+		flickAction.put(
+				SoftKeyFlickEvent.Direction.DOWN,
+				pref.getString("keyboard_action_on_flick_down", FLICK_SYMBOL));
+		flickAction.put(
+				SoftKeyFlickEvent.Direction.LEFT,
+				pref.getString("keyboard_action_on_flick_left", FLICK_NONE));
+		flickAction.put(
+				SoftKeyFlickEvent.Direction.RIGHT,
+				pref.getString("keyboard_action_on_flick_right", FLICK_NONE));
+		mLongPressAction = pref.getString("system_action_on_long_press", FLICK_SHIFT);
+		mQwertyEngine.setMoachigi(hasHardwareKeyboard() ? mHardwareMoachigi : mMoachigi);
+		m12keyEngine.setMoachigi(mMoachigi);
+		mQwertyEngine.setFirstMidEnd(mStandardJamo);
+		m12keyEngine.setFirstMidEnd(mStandardJamo);
+		mAltDirect = pref.getBoolean("hardware_alt_direct", true);
+		mLastLanguage = pref.getInt("misc_last_language", 0);
 	}
 
 	@Override
 	public View onCreateInputView() {
-		int hiddenState = getResources().getConfiguration().hardKeyboardHidden;
-		boolean hidden = (hiddenState == Configuration.HARDKEYBOARDHIDDEN_YES);
-		((DefaultSoftKeyboard) mInputViewManager).setHardKeyboardHidden(hidden);
-
-		SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
-
-        boolean hardKeyboardHidden = ((me.blog.hgl1002.openwnn.DefaultSoftKeyboard) mInputViewManager).mHardKeyboardHidden;
-
-        String altLayout = pref.getString("keyboard_symbols_layout", "keyboard_symbols_a");
-        mAltLayout = EngineMode.get(altLayout).layout;
-
-        setCandidatesViewShown(pref.getBoolean("conversion_show_candidates", false));
-
-        mMoachigi = pref.getBoolean("keyboard_use_moachigi", mMoachigi);
-        mHardwareMoachigi = pref.getBoolean("hardware_use_moachigi", mHardwareMoachigi);
-        mFullMoachigi = pref.getBoolean("hardware_full_moachigi", mFullMoachigi);
-        mMoachigiDelay = pref.getInt("hardware_full_moachigi_delay", 100);
-        mQuickPeriod = pref.getBoolean("keyboard_quick_period", false);
-        mSpaceResetJohab = pref.getBoolean("keyboard_space_reset_composing", mSpaceResetJohab);
-
-        mStandardJamo = pref.getBoolean("system_use_standard_jamo", mStandardJamo);
-        mLangKeyAction = pref.getString("system_action_on_lang_key_press", LANGKEY_SWITCH_KOR_ENG);
-        mLangKeyLongAction = pref.getString("system_action_on_lang_key_long_press", LANGKEY_LIST_METHODS);
-        mAltKeyLongAction = pref.getString("system_action_on_alt_key_long_press", LANGKEY_LIST_ACTIONS);
-        mHardLangKey = KeystrokePreference.parseKeyStroke(pref.getString("system_hardware_lang_key_stroke", "---s62"));
-
-        flickAction.put(SoftKeyFlickEvent.Direction.UP, pref.getString("keyboard_action_on_flick_up", FLICK_SHIFT));
-        flickAction.put(SoftKeyFlickEvent.Direction.DOWN, pref.getString("keyboard_action_on_flick_down", FLICK_SYMBOL));
-        flickAction.put(SoftKeyFlickEvent.Direction.LEFT, pref.getString("keyboard_action_on_flick_left", FLICK_NONE));
-        flickAction.put(SoftKeyFlickEvent.Direction.RIGHT, pref.getString("keyboard_action_on_flick_right", FLICK_NONE));
-        mLongPressAction = pref.getString("system_action_on_long_press", FLICK_SHIFT);
-
-        if(hardKeyboardHidden) {
-            mQwertyEngine.setMoachigi(mMoachigi);
-            m12keyEngine.setMoachigi(mMoachigi);
-        } else {
-            mQwertyEngine.setMoachigi(mHardwareMoachigi);
-        }
-        mQwertyEngine.setFirstMidEnd(mStandardJamo);
-        m12keyEngine.setFirstMidEnd(mStandardJamo);
-
-        mAltDirect = pref.getBoolean("hardware_alt_direct", true);
-
-    	mLastLanguage = pref.getInt("misc_last_language", mLastLanguage);
-
-		if (mInputViewManager != null) {
-			WindowManager wm = (WindowManager)getSystemService(Context.WINDOW_SERVICE);
-			assert wm != null;
-			View view = mInputViewManager.initView(this,
-					wm.getDefaultDisplay().getWidth(),
-					wm.getDefaultDisplay().getHeight());
-
-//			view.setFitsSystemWindows(true);
-			if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) updateNavigationBar();
-
-			return view;
-		} else {
-			return super.onCreateInputView();
+		if (mPreparedInputView == null) {
+			android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+			mPreparedInputView =
+					mInputViewManager.initView(this, metrics.widthPixels, metrics.heightPixels);
 		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) updateNavigationBar();
+		return mPreparedInputView;
+	}
+
+	@Override
+	public void onWindowShown() {
+		super.onWindowShown();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) updateNavigationBar();
 	}
 
 	@Override
 	public void onStartInputView(EditorInfo attribute, boolean restarting) {
-		resetCharComposition();
-		mInputConnection = getCurrentInputConnection();
-
-		if(!restarting) {
-			mHardShift = 0;
-			mHardAlt = 0;
-			updateMetaKeyStateDisplay();
-			updateNumKeyboardShiftState();
-		}
-
 		super.onStartInputView(attribute, restarting);
-
+		mInputConnection = getCurrentInputConnection();
+		mInputViewManager.startInputView();
 		setCandidatesViewShown(false);
-		mDirectInputMode = mInputConnection == null;
-		SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
-		if (mInputViewManager != null) mInputViewManager.setPreferences(pref, attribute);
+	}
 
-		mCharInput = false;
-
-		if(!restarting && mLangKeyAction.equals(LANGKEY_SWITCH_METHOD_MIXED)) {
-			((DefaultSoftKeyboard) mInputViewManager).setLanguage(mLastLanguage);
-		}
+	@Override
+	public void onFinishInputView(boolean finishingInput) {
+		mInputViewManager.closing();
+		super.onFinishInputView(finishingInput);
 	}
 
 	@Override
 	public void onStartInput(EditorInfo attribute, boolean restarting) {
 		super.onStartInput(attribute, restarting);
+		mInputConnection = getCurrentInputConnection();
+		resetCharComposition();
+		loadPreferences();
+		if (!restarting) {
+			mHardShift = 0;
+			mHardAlt = 0;
+			mCapsLock = false;
+		}
+		// Prepare the legacy view-backed layout manager even when its window is hidden.
+		// Input state now belongs to the editor session, not onStartInputView().
+		setInputView(onCreateInputView());
+		mInputViewManager.setPreferences(mPreferences, attribute);
+		mCharInput = false;
+		if (!restarting && LANGKEY_SWITCH_METHOD_MIXED.equals(mLangKeyAction)) {
+			((DefaultSoftKeyboard) mInputViewManager).setLanguage(mLastLanguage);
+		}
+		applyKeyboardVisibility();
+	}
+
+	@Override
+	public void onSharedPreferenceChanged(SharedPreferences preferences, String key) {
+		if (key == null || key.startsWith("misc_") || "initial_launch".equals(key)) return;
+		mSettingsHandler.removeCallbacks(mRefreshSettings);
+		mSettingsHandler.post(mRefreshSettings);
+	}
+
+	private void refreshSettings() {
+		if (mRefreshingSettings) return;
+		mRefreshingSettings = true;
+		try {
+			finishComposition();
+			mLocalizedResources = AppLanguage.resources(this, super.getResources());
+			loadPreferences();
+			mInputViewManager.closing();
+			mPreparedInputView = null;
+			if (getCurrentInputEditorInfo() != null) {
+				setInputView(onCreateInputView());
+				mInputViewManager.setPreferences(mPreferences, getCurrentInputEditorInfo());
+			}
+			applyKeyboardVisibility();
+		} finally {
+			mRefreshingSettings = false;
+		}
+	}
+
+	private void applyKeyboardVisibility() {
+		boolean wasSuppressed = mKeyboardSuppressed;
+		mKeyboardSuppressed = shouldHideKeyboard();
+		updateInputViewShown();
+		if (mKeyboardSuppressed) {
+			super.setCandidatesViewShown(false);
+			requestHideSelf(0);
+		} else if (wasSuppressed
+				&& getCurrentInputStarted()
+				&& getCurrentInputEditorInfo() != null
+				&& getCurrentInputEditorInfo().inputType != android.text.InputType.TYPE_NULL) {
+			if (Build.VERSION.SDK_INT >= 28) requestShowSelf(0);
+			else showWindow(true);
+		}
+	}
+
+	@Override
+	public boolean onShowInputRequested(int flags, boolean configChange) {
+		return !shouldHideKeyboard() && super.onShowInputRequested(flags, configChange);
 	}
 
 	@Override
@@ -305,22 +376,25 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 
 	@Override
 	public void onConfigurationChanged(Configuration newConfig) {
-		try {
-			super.onConfigurationChanged(newConfig);
-
-			if (mInputConnection != null) {
-				/* Hardware keyboard */
-				int hiddenState = newConfig.hardKeyboardHidden;
-				boolean hidden = (hiddenState == Configuration.HARDKEYBOARDHIDDEN_YES);
-				((DefaultSoftKeyboard) mInputViewManager).setHardKeyboardHidden(hidden);
-			}
-		} catch (Exception ignored) {
-		}
+		mHardwareKeys.reset();
+		mInputViewManager.closing();
+		mPreparedInputView = null;
+		mLocalizedResources = AppLanguage.resources(this, super.getResources());
+		loadPreferences();
+		super.onConfigurationChanged(newConfig);
+		applyKeyboardVisibility();
 	}
 
 	@Override
 	public void onFinishInput() {
+		mInputViewManager.closing();
+		mHardwareKeys.cancelLanguagePress();
+		if (mTimeOutHandler != null) {
+			mTimeOutHandler.removeCallbacksAndMessages(null);
+			mTimeOutHandler = null;
+		}
 		resetCharComposition();
+		mInputConnection = null;
 		super.onFinishInput();
 	}
 
@@ -337,32 +411,20 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 		}
 		if(event instanceof SetComposingEvent) {
 			SetComposingEvent composingEvent = (SetComposingEvent) event;
-			mInputConnection.setComposingText(composingEvent.getComposing(), 1);
+			if (mInputConnection != null)
+				mInputConnection.setComposingText(composingEvent.getComposing(), 1);
 		}
 	}
 
-	@Subscribe
-	public void onKeyUp(KeyUpEvent event) {
-		int key = event.getKeyEvent().getKeyCode();
-		if(!mShiftPressing){
-			if(key == KeyEvent.KEYCODE_SHIFT_LEFT
-					|| key == KeyEvent.KEYCODE_SHIFT_RIGHT){
-				mHardShift = 0;
-				mShiftPressing = true;
-				if(mShiftOnCapsLock) {
-					mHardShift = 2;
-					mShiftOnCapsLock = false;
-				}
-				updateMetaKeyStateDisplay();
-				updateNumKeyboardShiftState();
-			}
-		}
-		if(!mAltPressing) {
-			if(key == KeyEvent.KEYCODE_ALT_LEFT || key == KeyEvent.KEYCODE_ALT_RIGHT){
-				mHardAlt = 0;
-				mAltPressing = true;
-				updateMetaKeyStateDisplay();
-			}
+	private void synchronizeHardwareModifiers(KeyEvent event) {
+		mCapsLock = event.isCapsLockOn();
+		mHardShift = event.isShiftPressed() ? 1 : (mCapsLock ? 2 : 0);
+		mHardAlt = event.isAltPressed() ? 1 : 0;
+		mShiftPressing = event.isShiftPressed();
+		mAltPressing = event.isAltPressed();
+		if (mPreparedInputView != null) {
+			updateMetaKeyStateDisplay();
+			updateNumKeyboardShiftState();
 		}
 	}
 
@@ -390,7 +452,8 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 		mAltMode = prop.altMode;
 		mDirectInputMode = prop.direct;
 		mEnableTimeout = prop.timeout;
-		mFullMoachigi = prop.fullMoachigi;
+		mFullMoachigi =
+				prop.fullMoachigi && mPreferences.getBoolean("hardware_full_moachigi", true);
 		mHangulEngine = prop.twelveEngine ? m12keyEngine : mQwertyEngine;
 		if(mode.jamoset != null) mHangulEngine.setJamoSet(mode.jamoset);
 		else mHangulEngine.setJamoTable(mode.layout);
@@ -408,10 +471,10 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 
 	@Subscribe
 	public void onInputViewChange(InputViewChangeEvent event) {
-		View inputView = onCreateInputView();
-		if(inputView != null) setInputView(inputView);
-		View candidatesView = onCreateCandidatesView();
-		if(candidatesView != null) setCandidatesView(candidatesView);
+		mInputViewManager.closing();
+		mPreparedInputView = null;
+		loadPreferences();
+		if (getCurrentInputEditorInfo() != null) setInputView(onCreateInputView());
 	}
 
 	@Subscribe
@@ -535,74 +598,12 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 	@Subscribe
 	public void onInputKey(InputKeyEvent event) {
 		KeyEvent keyEvent = event.getKeyEvent();
-		switch(keyEvent.getKeyCode()) {
-		case KeyEvent.KEYCODE_ALT_LEFT:
-		case KeyEvent.KEYCODE_ALT_RIGHT:
-			if (keyEvent.getRepeatCount() == 0) {
-				if (++mHardAlt > 2) { mHardAlt = 0; }
-			}
-			mAltPressing = true;
-			updateMetaKeyStateDisplay();
-			return;
-
-		case KeyEvent.KEYCODE_DPAD_LEFT:
-		case KeyEvent.KEYCODE_DPAD_RIGHT:
-		case KeyEvent.KEYCODE_DPAD_UP:
-		case KeyEvent.KEYCODE_DPAD_DOWN:
-			if(mHardShift > 0) {
-				resetHardShift(true);
-				updateMetaKeyStateDisplay();
-				updateNumKeyboardShiftState();
-			}
-			return;
-
-		case KeyEvent.KEYCODE_SHIFT_LEFT:
-		case KeyEvent.KEYCODE_SHIFT_RIGHT:
-			if (keyEvent.getRepeatCount() == 0) {
-				if (++mHardShift > 2) { mHardShift = 0; }
-			}
-			mShiftPressing = true;
-			if(mCapsLock) {
-				mHardShift = 0;
-				mShiftPressing = false;
-				mShiftOnCapsLock = true;
-			}
-			updateMetaKeyStateDisplay();
-			updateNumKeyboardShiftState();
-			return;
-
-		case KeyEvent.KEYCODE_CAPS_LOCK:
-			mCapsLock = !mCapsLock;
-			if(mCapsLock) {
-				mHardShift = 2;
-				mShiftPressing = true;
-			} else {
-				mHardShift = 0;
-				mShiftPressing = false;
-			}
-			updateMetaKeyStateDisplay();
-			updateNumKeyboardShiftState();
-			return;
-
-		}
-		if((keyEvent.getMetaState() & KeyEvent.META_CAPS_LOCK_ON) != 0) {
-			if(!mShiftOnCapsLock) {
-				mCapsLock = true;
-				mHardShift = 2;
-				mShiftPressing = true;
-				updateMetaKeyStateDisplay();
-				updateNumKeyboardShiftState();
-			}
-		} else if(mCapsLock) {
-			mCapsLock = false;
-			mHardShift = 0;
-			mShiftPressing = false;
-			updateMetaKeyStateDisplay();
-			updateNumKeyboardShiftState();
-		}
+		synchronizeHardwareModifiers(keyEvent);
+		if (KeyEvent.isModifierKey(keyEvent.getKeyCode())
+				|| keyEvent.getKeyCode() == KeyEvent.KEYCODE_CAPS_LOCK) return;
+		if (mInputConnection == null) return;
 		((DefaultSoftKeyboard) mInputViewManager).fixHardwareLayoutState();
-		boolean ret = processKeyEvent(keyEvent);
-		event.setCancelled(ret);
+		event.setCancelled(processKeyEvent(keyEvent));
 		shinShift();
 	}
 
@@ -650,7 +651,7 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 			shinShift();
 			return;
 		}
-        System.out.println();
+		System.out.println();
 		boolean ret = processKeyEvent(keyEvent);
 		if(!ret && mInputConnection != null) {
 			int c = keyEvent.getKeyCode();
@@ -662,7 +663,7 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 
 	@Subscribe
 	public void onCommitComposingText(CommitComposingTextEvent event) {
-		getCurrentInputConnection().finishComposingText();
+		finishComposition();
 	}
 
 	private void inputChar(char code, boolean direct) {
@@ -770,22 +771,22 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 			}
 			break;
 
-        case LANGKEY_SWITCH_METHOD_MIXED:
-            assert imm != null;
-            DefaultSoftKeyboard softKeyboardKOKR = (DefaultSoftKeyboard) mInputViewManager;
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            	if(mInput) {
-            		mLastLanguage = softKeyboardKOKR.getLanguageId();
+		case LANGKEY_SWITCH_METHOD_MIXED:
+			assert imm != null;
+			DefaultSoftKeyboard softKeyboardKOKR = (DefaultSoftKeyboard) mInputViewManager;
+			if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+				if(mInput) {
+					mLastLanguage = softKeyboardKOKR.getLanguageId();
 				}
 				softKeyboardKOKR.nextLanguage();
-            	if(!mInput && mLastLanguage == softKeyboardKOKR.getLanguageId()) {
-            		editor.putInt("misc_last_language", mLastLanguage);
-            		editor.apply();
-            		imm.switchToNextInputMethod(token, false);
+				if(!mInput && mLastLanguage == softKeyboardKOKR.getLanguageId()) {
+					editor.putInt("misc_last_language", mLastLanguage);
+					editor.apply();
+					imm.switchToNextInputMethod(token, false);
 				}
 				mInput = false;
-            }
-            break;
+			}
+			break;
 
 		case LANGKEY_LIST_METHODS:
 			assert imm != null;
@@ -820,7 +821,7 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 		if(mInputConnection == null) return false;
 		int key = ev.getKeyCode();
 
-        if (ev.isCtrlPressed()) return false;
+		if (ev.isCtrlPressed()) return false;
 
 		if ((key <= -200 && key > -300) || (key <= -2000 && key > -3000)) {
 			int jamo = mHangulEngine.inputCode(key, mHardShift);
@@ -848,29 +849,6 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 		if (key >= KeyEvent.KEYCODE_NUMPAD_0 && key <= KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN) {
 			resetCharComposition();
 			return false;
-		}
-
-		if(mHardLangKey != null && key == mHardLangKey.getKeyCode()) {
-			if((mHardShift == 1) == mHardLangKey.isShift()
-					&& ((mHardAlt == 1) == mHardLangKey.isAlt())
-					&& ev.isCtrlPressed() == mHardLangKey.isControl()
-					&& ev.isMetaPressed() == mHardLangKey.isWin()) {
-
-				resetCharComposition();
-				((DefaultSoftKeyboard) mInputViewManager).nextLanguage();
-
-				mHardShift = 0;
-				mShiftPressing = false;
-				mInputConnection.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT));
-				mHardAlt = 0;
-				mAltPressing = false;
-				mInputConnection.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ALT_LEFT));
-
-				updateMetaKeyStateDisplay();
-				updateNumKeyboardShiftState();
-
-				return true;
-			}
 		}
 
 		if (ev.isPrintingKey()) {
@@ -1053,14 +1031,19 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 	public void hideWindow() {
 		mInputViewManager.closing();
 		super.hideWindow();
-		mDirectInputMode = true;
 		hideStatusIcon();
 	}
 
 	@Override
 	public void onDestroy() {
-		super.onDestroy();
+		mInputViewManager.closing();
+		mSettingsHandler.removeCallbacksAndMessages(null);
+		mHardwareKeys.reset();
+		if (mTimeOutHandler != null) mTimeOutHandler.removeCallbacksAndMessages(null);
+		if (mPreferences != null) mPreferences.unregisterOnSharedPreferenceChangeListener(this);
 		EventBus.getDefault().unregister(this);
+		if (mSelf.get() == this) mSelf.clear();
+		super.onDestroy();
 	}
 
 	/** @see android.inputmethodservice.InputMethodService#onComputeInsets */
@@ -1089,28 +1072,56 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
-		if(mTimeOutHandler == null) {
-			mTimeOutHandler = new Handler();
-			mTimeOutHandler.postDelayed(() -> {
-                EventBus.getDefault().post(new InputTimeoutEvent());
-                mTimeOutHandler = null;
-            }, mMoachigiDelay);
+		mInputConnection = getCurrentInputConnection();
+		if (mPreparedInputView == null && mInputConnection == null)
+			return super.onKeyDown(keyCode, event);
+		if (mHardwareKeys.onKeyDown(event)) return true;
+		if (mHardwareKeys.isShortcut(event)) return super.onKeyDown(keyCode, event);
+		if (mTimeOutHandler == null && !KeyEvent.isModifierKey(keyCode)) {
+			mTimeOutHandler = new Handler(Looper.getMainLooper());
+			mTimeOutHandler.postDelayed(
+					() -> {
+						if (mInputConnection != null)
+							EventBus.getDefault().post(new InputTimeoutEvent());
+						mTimeOutHandler = null;
+					},
+					mMoachigiDelay);
 		}
 		InputKeyEvent inputKeyEvent = new InputKeyEvent(event);
 		EventBus.getDefault().post(inputKeyEvent);
-		mConsumeDownEvent = inputKeyEvent.isCancelled();
-		return mConsumeDownEvent || super.onKeyDown(keyCode, event);
+		if (inputKeyEvent.isCancelled()) {
+			mHardwareKeys.consume(event);
+			return true;
+		}
+		return super.onKeyDown(keyCode, event);
 	}
 
 	@Override
 	public boolean onKeyUp(int keyCode, KeyEvent event) {
-		boolean ret = mConsumeDownEvent;
-		if(!ret) {
-			ret = super.onKeyUp(keyCode, event);
-		} else {
-			EventBus.getDefault().post(new KeyUpEvent(event));
+		boolean consumed = mHardwareKeys.onKeyUp(event);
+		synchronizeHardwareModifiers(event);
+		return consumed || super.onKeyUp(keyCode, event);
+	}
+
+	@Override
+	public void finishComposition() {
+		if (mTimeOutHandler != null) {
+			mTimeOutHandler.removeCallbacksAndMessages(null);
+			mTimeOutHandler = null;
 		}
-		return ret;
+		resetCharComposition();
+		if (mInputConnection != null) mInputConnection.finishComposingText();
+	}
+
+	@Override
+	public void performLanguageAction(String action) {
+		onLangKey(action);
+	}
+
+	@Override
+	public boolean sendKeyEvent(KeyEvent event) {
+		InputConnection connection = getCurrentInputConnection();
+		return connection != null && connection.sendKeyEvent(event);
 	}
 
 	@Override
@@ -1121,11 +1132,12 @@ public class SebeolHangulIME extends InputMethodService implements HangulEngineL
 	@Override
 	public boolean onEvaluateInputViewShown() {
 		super.onEvaluateInputViewShown();
-		return true;
+		return !shouldHideKeyboard();
 	}
 
 	/** @see android.inputmethodservice.InputMethodService#setCandidatesViewShown */
 	@Override public void setCandidatesViewShown(boolean shown) {
+		shown = shown && !shouldHideKeyboard();
 		super.setCandidatesViewShown(shown);
 		if (shown) {
 			showWindow(true);

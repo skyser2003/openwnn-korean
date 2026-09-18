@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="preference_app_language_title">App language</string>
+    <string name="preference_app_language_system">System default</string>
+    <string name="preference_hardware_hide_keyboard_title">Hide software keyboard completely</string>
+    <string name="preference_hardware_hide_keyboard_summary">Hide the keyboard, number pad, and indicator strip while a physical keyboard is connected. Hardware typing stays active.</string>
+    <string name="preference_hardware_shortcut_layout_title">Shortcut layout</string>
+    <string name="preference_hardware_shortcut_layout_summary">Choose the layout for Ctrl, Alt, and Meta shortcuts received by this keyboard, in both English and Korean input modes.</string>
+    <string name="preference_hardware_shortcut_layout_follow">Follow hardware alphabet layout</string>
+    <string name="preference_hardware_shortcut_layout_qwerty">QWERTY key positions</string>
+    <string-array name="app_languages">
+        <item>@string/preference_app_language_system</item>
+        <item>English</item>
+        <item>한국어</item>
+    </string-array>
+    <string-array name="app_language_values" translatable="false">
+        <item>system</item>
+        <item>en</item>
+        <item>ko</item>
+    </string-array>
+    <string-array name="hardware_shortcut_layouts">
+        <item>@string/preference_hardware_shortcut_layout_follow</item>
+        <item>@string/preference_hardware_shortcut_layout_qwerty</item>
+    </string-array>
+    <string-array name="hardware_shortcut_layout_values" translatable="false">
+        <item>layout</item>
+        <item>qwerty</item>
+    </string-array>
+</resources>

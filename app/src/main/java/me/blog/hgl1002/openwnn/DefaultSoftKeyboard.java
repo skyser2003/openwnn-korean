@@ -16,21 +16,20 @@
 
 package me.blog.hgl1002.openwnn;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.res.*;
+import android.inputmethodservice.Keyboard;
+import android.inputmethodservice.KeyboardView;
+import android.media.MediaPlayer;
+import android.os.Vibrator;
+import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
 
-import android.inputmethodservice.Keyboard;
-import android.inputmethodservice.KeyboardView;
-import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
-import android.content.res.*;
-import android.os.Vibrator;
-import android.media.MediaPlayer;
-import android.content.Context;
-
-import android.util.Log;
 
 /**
  * The default software keyboard class.
@@ -549,83 +548,85 @@ public class DefaultSoftKeyboard implements InputViewManager, KeyboardView.OnKey
         
         return mMainView;
     }
-    
+
     /**
      * Update the SHFIT/ALT keys indicator.
-     * 
-     * @param mode  The state of SHIFT/ALT keys.
+     *
+     * @param mode The state of SHIFT/ALT keys.
      */
     public void updateIndicator(int mode) {
         Resources res = mIME.getResources();
-        TextView text1 = (TextView)mSubView.findViewById(R.id.shift);
-        TextView text2 = (TextView)mSubView.findViewById(R.id.alt);
+        TextView text1 = (TextView) mSubView.findViewById(R.id.shift);
+        TextView text2 = (TextView) mSubView.findViewById(R.id.alt);
 
         switch (mode) {
-        case HARD_KEYMODE_SHIFT_OFF_ALT_OFF:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            break;
-        case HARD_KEYMODE_SHIFT_ON_ALT_OFF:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_on));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            break;
-        case HARD_KEYMODE_SHIFT_LOCK_ALT_OFF:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_lock));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_background_lock_caps));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            break;
-        case HARD_KEYMODE_SHIFT_OFF_ALT_ON:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_on));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            break;
-        case HARD_KEYMODE_SHIFT_OFF_ALT_LOCK:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_lock));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_background_lock_alt));
-            break;
-        case HARD_KEYMODE_SHIFT_ON_ALT_ON:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_on));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_on));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            break;
-        case HARD_KEYMODE_SHIFT_ON_ALT_LOCK:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_on));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_lock));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_background_lock_alt));
-            break;
-        case HARD_KEYMODE_SHIFT_LOCK_ALT_ON:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_lock));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_on));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_background_lock_caps));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            break;
-        case HARD_KEYMODE_SHIFT_LOCK_ALT_LOCK:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_lock));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_lock));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_background_lock_caps));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_background_lock_alt));
-            break;
-        default:
-            text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
-            text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
-            text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
-            break;
+            case HARD_KEYMODE_SHIFT_OFF_ALT_OFF:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                break;
+            case HARD_KEYMODE_SHIFT_ON_ALT_OFF:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_on));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                break;
+            case HARD_KEYMODE_SHIFT_LOCK_ALT_OFF:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_lock));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_background_lock_caps));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                break;
+            case HARD_KEYMODE_SHIFT_OFF_ALT_ON:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_on));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                break;
+            case HARD_KEYMODE_SHIFT_OFF_ALT_LOCK:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_lock));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_background_lock_alt));
+                break;
+            case HARD_KEYMODE_SHIFT_ON_ALT_ON:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_on));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_on));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                break;
+            case HARD_KEYMODE_SHIFT_ON_ALT_LOCK:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_on));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_lock));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_background_lock_alt));
+                break;
+            case HARD_KEYMODE_SHIFT_LOCK_ALT_ON:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_lock));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_on));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_background_lock_caps));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                break;
+            case HARD_KEYMODE_SHIFT_LOCK_ALT_LOCK:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_lock));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_lock));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_background_lock_caps));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_background_lock_alt));
+                break;
+            default:
+                text1.setTextColor(res.getColor(R.color.indicator_textcolor_caps_off));
+                text2.setTextColor(res.getColor(R.color.indicator_textcolor_alt_off));
+                text1.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                text2.setBackgroundColor(res.getColor(R.color.indicator_textbackground_default));
+                break;
         }
         return;
     }
-    
-    /** @see me.blog.hgl1002.openwnn.InputViewManager#getCurrentView */
+
+    /**
+     * @see me.blog.hgl1002.openwnn.InputViewManager#getCurrentView
+     */
     public View getCurrentView() {
         if (mCurrentKeyboard == null) {
             return null;
@@ -665,6 +666,11 @@ public class DefaultSoftKeyboard implements InputViewManager, KeyboardView.OnKey
         /* pop-up preview */
         mKeyboardView.setPreviewEnabled(pref.getBoolean("popup_preview", true));
 
+    }
+
+    @Override
+    public void startInputView() {
+        mDisableKeyInput = false;
     }
 
     /** @see me.blog.hgl1002.openwnn.InputViewManager#closing */

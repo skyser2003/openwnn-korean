@@ -292,8 +292,8 @@
   <string name="preference_hardware_full_moachigi_delay_title">Full Moachigi Timeout</string>
   <string name="preference_hardware_full_moachigi_delay_summary">Set the timeout (ms) for Full Moachigi. Default value is 100.</string>
 
-    <string name="preference_hardware_alt_direct_title">Alt Direct input</string>
-    <string name="preference_hardware_alt_direct_summary">Always input literal chars on hard Alt combination.</string>
+    <string name="preference_hardware_alt_direct_title">Right Alt types symbols</string>
+    <string name="preference_hardware_alt_direct_summary">Use right Alt (AltGr) for literal characters. Left Alt remains available for app shortcuts.</string>
 
 
     <string name="preference_conversion_setting_menu">Conversion &amp; Prediction</string>
@@ -342,7 +342,7 @@
   <string name="preference_system_list_actions_title">Select Action</string>
 
   <string name="preference_hardware_lang_key_title">Hardware Keyboard Language Key</string>
-  <string name="preference_hardware_lang_key_summary">Customize language key storke with shift, alt combinations.</string>
+  <string name="preference_hardware_lang_key_summary">Press a key or combination, such as Shift+Space or Ctrl+Space. Tap to run the language-key action; hold to run its long-press action.</string>
 
   <string name="preference_system_force_hangul_title">Force Hangeul Keyboard</string>
   <string name="preference_system_force_hangul_summary">Set default keyboard language to Hangeul and force it to be shown first.</string>

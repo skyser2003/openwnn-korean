@@ -1,27 +1,21 @@
 package me.blog.hgl1002.openwnn.preference;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.res.TypedArray;
-import android.os.Build;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.CheckBox;
-import android.widget.EditText;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.preference.Preference;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
+import me.blog.hgl1002.openwnn.HardwareShortcutMapper;
 import me.blog.hgl1002.openwnn.R;
 
 public class KeystrokePreference extends Preference {
-
-	private String defaultValue;
+	private String defaultStroke = "---s62";
 
 	public KeystrokePreference(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -34,90 +28,110 @@ public class KeystrokePreference extends Preference {
 	@Override
 	protected void onClick() {
 		View view = View.inflate(getContext(), R.layout.select_keystroke, null);
-		final EditText display = (EditText) view.findViewById(R.id.key_display);
-		final TextView description = (TextView) view.findViewById(R.id.key_description);
+		TextView display = view.findViewById(R.id.key_display);
+		TextView description = view.findViewById(R.id.key_description);
 		description.setText(getSummary());
-
-		final CheckBox control = (CheckBox) view.findViewById(R.id.key_control);
-		final CheckBox alt= (CheckBox) view.findViewById(R.id.key_alt);
-		final CheckBox win = (CheckBox) view.findViewById(R.id.key_win);
-		final CheckBox shift = (CheckBox) view.findViewById(R.id.key_shift);
-		final AtomicInteger code = new AtomicInteger(0);
-
-		KeyStroke stroke = parseKeyStroke(getPersistedString(defaultValue == null ? "----0" : defaultValue));
-		control.setChecked(stroke.control);
-		alt.setChecked(stroke.alt);
-		win.setChecked(stroke.win);
-		shift.setChecked(stroke.shift);
-		code.set(stroke.keyCode);
-		if(Build.VERSION.SDK_INT >= 12) {
-			display.setText(KeyEvent.keyCodeToString(stroke.keyCode));
-		} else {
-			display.setText(stroke.keyCode);
-		}
-
-		AlertDialog dialog = new AlertDialog.Builder(getContext())
+		CheckBox control = view.findViewById(R.id.key_control);
+		CheckBox alt = view.findViewById(R.id.key_alt);
+		CheckBox win = view.findViewById(R.id.key_win);
+		CheckBox shift = view.findViewById(R.id.key_shift);
+		Capture capture = new Capture(parseKeyStroke(getPersistedString(defaultStroke)));
+		KeyStroke stroke = capture.getStroke();
+		control.setChecked(stroke.isControl());
+		alt.setChecked(stroke.isAlt());
+		win.setChecked(stroke.isWin());
+		shift.setChecked(stroke.isShift());
+		display.setText(KeyEvent.keyCodeToString(stroke.getKeyCode()));
+		new AlertDialog.Builder(getContext())
 				.setTitle(getTitle())
 				.setView(view)
-				.setOnKeyListener(new DialogInterface.OnKeyListener() {
-					@Override
-					public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
-						code.set(keyCode);
-						if(Build.VERSION.SDK_INT >= 12) {
-							display.setText(KeyEvent.keyCodeToString(keyCode));
-						} else {
-							display.setText(keyCode);
-						}
-						return false;
-					}
-				})
-				.setPositiveButton(R.string.dialog_button_ok, new DialogInterface.OnClickListener() {
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-						StringBuilder builder = new StringBuilder();
-						builder.append(control.isChecked() ? 'c' : '-');
-						builder.append(alt.isChecked() ? 'a' : '-');
-						builder.append(win.isChecked() ? 'w' : '-');
-						builder.append(shift.isChecked() ? 's' : '-');
-						builder.append(String.valueOf(code.intValue()));
-						persistString(builder.toString());
-					}
-				})
-				.setNegativeButton(R.string.dialog_button_cancel, new DialogInterface.OnClickListener() {
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-
-					}
-				})
-				.create();
-		dialog.show();
-		super.onClick();
+				.setOnKeyListener(
+						(dialog, keyCode, event) -> {
+							if (keyCode == KeyEvent.KEYCODE_BACK) return false;
+							if (capture.accept(event)) {
+								KeyStroke captured = capture.getStroke();
+								display.setText(KeyEvent.keyCodeToString(captured.getKeyCode()));
+								control.setChecked(captured.isControl());
+								alt.setChecked(captured.isAlt());
+								win.setChecked(captured.isWin());
+								shift.setChecked(captured.isShift());
+							}
+							return true;
+						})
+				.setPositiveButton(
+						R.string.dialog_button_ok,
+						(dialog, which) -> {
+							String value =
+									new KeyStroke(
+													control.isChecked(),
+													alt.isChecked(),
+													win.isChecked(),
+													shift.isChecked(),
+													capture.getStroke().getKeyCode())
+											.serialize();
+							if (callChangeListener(value)) {
+								persistString(value);
+								notifyChanged();
+							}
+						})
+				.setNegativeButton(R.string.dialog_button_cancel, null)
+				.show();
 	}
 
-	public static KeyStroke parseKeyStroke(String keyStrokeStr) {
-		Integer keyCode = Integer.parseInt(keyStrokeStr.substring(4));
-		if(keyCode == null) return null;
-		boolean control = keyStrokeStr.charAt(0) == 'c';
-		boolean alt = keyStrokeStr.charAt(1) == 'a';
-		boolean win = keyStrokeStr.charAt(2) == 'w';
-		boolean shift = keyStrokeStr.charAt(3) == 's';
-		return new KeyStroke(control, alt, win, shift, keyCode);
+	public static KeyStroke parseKeyStroke(String value) {
+		if (value != null && value.matches("[c-][a-][w-][s-][0-9]+")) {
+			try {
+				int code = Integer.parseInt(value.substring(4));
+				if (code > KeyEvent.KEYCODE_UNKNOWN && code <= KeyEvent.getMaxKeyCode()) {
+					return new KeyStroke(
+							value.charAt(0) == 'c',
+							value.charAt(1) == 'a',
+							value.charAt(2) == 'w',
+							value.charAt(3) == 's',
+							code);
+				}
+			} catch (NumberFormatException invalidKeyCode) {
+				// Restore the default when an old or corrupted preference cannot be decoded.
+			}
+		}
+		return new KeyStroke(false, false, false, true, KeyEvent.KEYCODE_SPACE);
 	}
 
 	@Override
-	protected Object onGetDefaultValue(TypedArray a, int index) {
-		return a.getString(index);
+	protected String onGetDefaultValue(TypedArray attributes, int index) {
+		defaultStroke = attributes.getString(index);
+		return defaultStroke;
 	}
 
-	@Override
-	protected void onSetInitialValue(boolean restorePersistedValue, Object defaultValue) {
-		super.onSetInitialValue(restorePersistedValue, defaultValue);
-		if(!restorePersistedValue) this.defaultValue = (String) defaultValue;
+	public static final class Capture {
+		private KeyStroke stroke;
+		private boolean capturedPrimary;
+
+		public Capture(KeyStroke initial) {
+			stroke = initial;
+		}
+
+		public boolean accept(KeyEvent event) {
+			if (event.getAction() != KeyEvent.ACTION_DOWN || event.getRepeatCount() != 0)
+				return false;
+			boolean modifier = KeyEvent.isModifierKey(event.getKeyCode());
+			if (modifier && capturedPrimary) return false;
+			stroke = KeyStroke.fromEvent(event);
+			capturedPrimary = !modifier;
+			return true;
+		}
+
+		public KeyStroke getStroke() {
+			return stroke;
+		}
 	}
 
-	public static class KeyStroke {
-		boolean control, alt, win, shift;
-		int keyCode;
+	public static final class KeyStroke {
+		private final boolean control;
+		private final boolean alt;
+		private final boolean win;
+		private final boolean shift;
+		private final int keyCode;
 
 		public KeyStroke(boolean control, boolean alt, boolean win, boolean shift, int keyCode) {
 			this.control = control;
@@ -125,6 +139,44 @@ public class KeystrokePreference extends Preference {
 			this.win = win;
 			this.shift = shift;
 			this.keyCode = keyCode;
+		}
+
+		public static KeyStroke fromEvent(KeyEvent event) {
+			int code = event.getKeyCode();
+			return new KeyStroke(
+					event.isCtrlPressed()
+							&& code != KeyEvent.KEYCODE_CTRL_LEFT
+							&& code != KeyEvent.KEYCODE_CTRL_RIGHT,
+					event.isAltPressed()
+							&& code != KeyEvent.KEYCODE_ALT_LEFT
+							&& code != KeyEvent.KEYCODE_ALT_RIGHT,
+					event.isMetaPressed()
+							&& code != KeyEvent.KEYCODE_META_LEFT
+							&& code != KeyEvent.KEYCODE_META_RIGHT,
+					event.isShiftPressed()
+							&& code != KeyEvent.KEYCODE_SHIFT_LEFT
+							&& code != KeyEvent.KEYCODE_SHIFT_RIGHT,
+					code);
+		}
+
+		public boolean matches(KeyEvent event) {
+			return event.getKeyCode() == keyCode && matchesModifiers(event);
+		}
+
+		public boolean matchesModifiers(KeyEvent event) {
+			KeyStroke modifiers = fromEvent(HardwareShortcutMapper.withKeyCode(event, keyCode));
+			return control == modifiers.control
+					&& alt == modifiers.alt
+					&& win == modifiers.win
+					&& shift == modifiers.shift;
+		}
+
+		public String serialize() {
+			return (control ? "c" : "-")
+					+ (alt ? "a" : "-")
+					+ (win ? "w" : "-")
+					+ (shift ? "s" : "-")
+					+ keyCode;
 		}
 
 		public boolean isControl() {
@@ -147,5 +199,4 @@ public class KeystrokePreference extends Preference {
 			return keyCode;
 		}
 	}
-
 }

@@ -1,9 +1,5 @@
 package me.blog.hgl1002.openwnn.view;
 
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -25,14 +21,18 @@ import android.widget.TextView;
 
 import androidx.preference.PreferenceManager;
 
-import org.greenrobot.eventbus.EventBus;
-
+import me.blog.hgl1002.openwnn.R;
+import me.blog.hgl1002.openwnn.SebeolHangulIME;
+import me.blog.hgl1002.openwnn.event.*;
+import me.blog.hgl1002.openwnn.event.SoftKeyLongPressEvent;
 import me.blog.hgl1002.openwnn.hangul.EngineMode;
 import me.blog.hgl1002.openwnn.hangul.HangulEngine;
-import me.blog.hgl1002.openwnn.event.*;
-import me.blog.hgl1002.openwnn.SebeolHangulIME;
-import me.blog.hgl1002.openwnn.R;
-import me.blog.hgl1002.openwnn.event.SoftKeyLongPressEvent;
+
+import org.greenrobot.eventbus.EventBus;
+
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyboard {
 
@@ -126,48 +126,173 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 	};
 	int mCurrentLanguageIndex = 0;
 
-	Map<String, SoftKeyboardDisplay> mKeyboardDisplays = new HashMap<String, SoftKeyboardDisplay>() {{
-		put("dark", new SoftKeyboardDisplay() {{
-			add(KEYCODE_QWERTY_SHIFT, new SoftKeyDisplay(R.drawable.key_qwerty_shift, R.drawable.keybg_dark_mod_def));
-			add(KEYCODE_QWERTY_ENTER, new SoftKeyDisplay(R.drawable.key_qwerty_enter, R.drawable.keybg_dark_enter_def));
-			add(-10, new SoftKeyDisplay(R.drawable.key_qwerty_space));
-			add(KEYCODE_QWERTY_BACKSPACE, new SoftKeyDisplay(R.drawable.key_qwerty_del, R.drawable.keybg_dark_mod_def));
-			add(KEYCODE_JP12_ENTER, new SoftKeyDisplay(R.drawable.key_12key_enter, R.drawable.keybg_dark_enter_def));
-			add(KEYCODE_JP12_SPACE, new SoftKeyDisplay(R.drawable.key_12key_space, R.drawable.keybg_dark_mod_def));
-			add(KEYCODE_JP12_BACKSPACE, new SoftKeyDisplay(R.drawable.key_12key_del, R.drawable.keybg_dark_mod_def));
-			add(KEYCODE_QWERTY_ALT, new SoftKeyDisplay(0, R.drawable.keybg_dark_mod));
-			add(KEYCODE_CHANGE_LANG, new SoftKeyDisplay(0, R.drawable.keybg_dark_mod_def));
-		}});
-		put("white", new SoftKeyboardDisplay() {{
-			add(KEYCODE_QWERTY_SHIFT, new SoftKeyDisplay(R.drawable.key_qwerty_shift_b, R.drawable.keybg_white_mod_def));
-			add(KEYCODE_QWERTY_ENTER, new SoftKeyDisplay(R.drawable.key_qwerty_enter, R.drawable.keybg_white_enter_def));
-			add(-10, new SoftKeyDisplay(R.drawable.key_qwerty_space_b));
-			add(KEYCODE_QWERTY_BACKSPACE, new SoftKeyDisplay(R.drawable.key_qwerty_del_b, R.drawable.keybg_white_mod_def));
-			add(KEYCODE_JP12_ENTER, new SoftKeyDisplay(R.drawable.key_12key_enter, R.drawable.keybg_white_enter_def));
-			add(KEYCODE_JP12_SPACE, new SoftKeyDisplay(R.drawable.key_12key_space_b, R.drawable.keybg_white_mod_def));
-			add(KEYCODE_JP12_BACKSPACE, new SoftKeyDisplay(R.drawable.key_12key_del_b, R.drawable.keybg_white_mod_def));
-			add(KEYCODE_QWERTY_ALT, new SoftKeyDisplay(0, R.drawable.keybg_white_mod_def, Color.BLACK));
-			add(KEYCODE_CHANGE_LANG, new SoftKeyDisplay(0, R.drawable.keybg_white_mod_def, Color.BLACK));
-		}});
-		put("flat_dark", new SoftKeyboardDisplay(R.drawable.keybg_flat_bg, R.drawable.keybg_flat_def, Color.WHITE) {{
-			add(KEYCODE_QWERTY_SHIFT, new SoftKeyDisplay(R.drawable.key_qwerty_shift));
-			add(KEYCODE_QWERTY_ENTER, new SoftKeyDisplay(R.drawable.key_qwerty_enter, R.drawable.keybg_flat_enter_def, true));
-			add(-10, new SoftKeyDisplay(0, R.drawable.keybg_flat_space_def));
-			add(KEYCODE_QWERTY_BACKSPACE, new SoftKeyDisplay(R.drawable.key_qwerty_del));
-			add(KEYCODE_JP12_ENTER, new SoftKeyDisplay(R.drawable.key_12key_enter, R.drawable.keybg_flat_enter_def, true));
-			add(KEYCODE_JP12_SPACE, new SoftKeyDisplay(R.drawable.key_12key_space));
-			add(KEYCODE_JP12_BACKSPACE, new SoftKeyDisplay(R.drawable.key_12key_del));
-		}});
-		put("flat_blue", new SoftKeyboardDisplay(R.drawable.keybg_blue_bg, R.drawable.keybg_blue_def, Color.WHITE) {{
-			add(KEYCODE_QWERTY_SHIFT, new SoftKeyDisplay(R.drawable.key_qwerty_shift));
-			add(KEYCODE_QWERTY_ENTER, new SoftKeyDisplay(R.drawable.key_qwerty_enter, R.drawable.keybg_flat_enter_def, true));
-			add(-10, new SoftKeyDisplay(R.drawable.key_qwerty_space));
-			add(KEYCODE_QWERTY_BACKSPACE, new SoftKeyDisplay(R.drawable.key_qwerty_del));
-			add(KEYCODE_JP12_ENTER, new SoftKeyDisplay(R.drawable.key_12key_enter, R.drawable.keybg_flat_enter_def, true));
-			add(KEYCODE_JP12_SPACE, new SoftKeyDisplay(R.drawable.key_12key_space));
-			add(KEYCODE_JP12_BACKSPACE, new SoftKeyDisplay(R.drawable.key_12key_del));
-		}});
-	}};
+	Map<String, SoftKeyboardDisplay> mKeyboardDisplays =
+			new HashMap<String, SoftKeyboardDisplay>() {
+				{
+					put(
+							"dark",
+							new SoftKeyboardDisplay() {
+								{
+									add(
+											KEYCODE_QWERTY_SHIFT,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_shift,
+													R.drawable.keybg_dark_mod_def));
+									add(
+											KEYCODE_QWERTY_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_enter,
+													R.drawable.keybg_dark_enter_def));
+									add(-10, new SoftKeyDisplay(R.drawable.key_qwerty_space));
+									add(
+											KEYCODE_QWERTY_BACKSPACE,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_del,
+													R.drawable.keybg_dark_mod_def));
+									add(
+											KEYCODE_JP12_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_enter,
+													R.drawable.keybg_dark_enter_def));
+									add(
+											KEYCODE_JP12_SPACE,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_space,
+													R.drawable.keybg_dark_mod_def));
+									add(
+											KEYCODE_JP12_BACKSPACE,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_del,
+													R.drawable.keybg_dark_mod_def));
+									add(
+											KEYCODE_QWERTY_ALT,
+											new SoftKeyDisplay(0, R.drawable.keybg_dark_mod));
+									add(
+											KEYCODE_CHANGE_LANG,
+											new SoftKeyDisplay(0, R.drawable.keybg_dark_mod_def));
+								}
+							});
+					put(
+							"white",
+							new SoftKeyboardDisplay() {
+								{
+									add(
+											KEYCODE_QWERTY_SHIFT,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_shift_b,
+													R.drawable.keybg_white_mod_def));
+									add(
+											KEYCODE_QWERTY_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_enter,
+													R.drawable.keybg_white_enter_def));
+									add(-10, new SoftKeyDisplay(R.drawable.key_qwerty_space_b));
+									add(
+											KEYCODE_QWERTY_BACKSPACE,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_del_b,
+													R.drawable.keybg_white_mod_def));
+									add(
+											KEYCODE_JP12_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_enter,
+													R.drawable.keybg_white_enter_def));
+									add(
+											KEYCODE_JP12_SPACE,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_space_b,
+													R.drawable.keybg_white_mod_def));
+									add(
+											KEYCODE_JP12_BACKSPACE,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_del_b,
+													R.drawable.keybg_white_mod_def));
+									add(
+											KEYCODE_QWERTY_ALT,
+											new SoftKeyDisplay(
+													0,
+													R.drawable.keybg_white_mod_def,
+													Color.BLACK));
+									add(
+											KEYCODE_CHANGE_LANG,
+											new SoftKeyDisplay(
+													0,
+													R.drawable.keybg_white_mod_def,
+													Color.BLACK));
+								}
+							});
+					put(
+							"flat_dark",
+							new SoftKeyboardDisplay(
+									R.drawable.keybg_flat_bg,
+									R.drawable.keybg_flat_def,
+									Color.WHITE) {
+								{
+									add(
+											KEYCODE_QWERTY_SHIFT,
+											new SoftKeyDisplay(R.drawable.key_qwerty_shift));
+									add(
+											KEYCODE_QWERTY_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_enter,
+													R.drawable.keybg_flat_enter_def,
+													true));
+									add(
+											-10,
+											new SoftKeyDisplay(0, R.drawable.keybg_flat_space_def));
+									add(
+											KEYCODE_QWERTY_BACKSPACE,
+											new SoftKeyDisplay(R.drawable.key_qwerty_del));
+									add(
+											KEYCODE_JP12_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_enter,
+													R.drawable.keybg_flat_enter_def,
+													true));
+									add(
+											KEYCODE_JP12_SPACE,
+											new SoftKeyDisplay(R.drawable.key_12key_space));
+									add(
+											KEYCODE_JP12_BACKSPACE,
+											new SoftKeyDisplay(R.drawable.key_12key_del));
+								}
+							});
+					put(
+							"flat_blue",
+							new SoftKeyboardDisplay(
+									R.drawable.keybg_blue_bg,
+									R.drawable.keybg_blue_def,
+									Color.WHITE) {
+								{
+									add(
+											KEYCODE_QWERTY_SHIFT,
+											new SoftKeyDisplay(R.drawable.key_qwerty_shift));
+									add(
+											KEYCODE_QWERTY_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_qwerty_enter,
+													R.drawable.keybg_flat_enter_def,
+													true));
+									add(-10, new SoftKeyDisplay(R.drawable.key_qwerty_space));
+									add(
+											KEYCODE_QWERTY_BACKSPACE,
+											new SoftKeyDisplay(R.drawable.key_qwerty_del));
+									add(
+											KEYCODE_JP12_ENTER,
+											new SoftKeyDisplay(
+													R.drawable.key_12key_enter,
+													R.drawable.keybg_flat_enter_def,
+													true));
+									add(
+											KEYCODE_JP12_SPACE,
+											new SoftKeyDisplay(R.drawable.key_12key_space));
+									add(
+											KEYCODE_JP12_BACKSPACE,
+											new SoftKeyDisplay(R.drawable.key_12key_del));
+								}
+							});
+				}
+			};
 
 	Handler mTimeoutHandler;
 	class TimeOutHandler implements Runnable {
@@ -185,7 +310,9 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 		public LongClickHandler(int keyCode) {
 			this.keyCode = keyCode;
 		}
+
 		public void run() {
+			if (mDisableKeyInput) return;
 			setPreviewEnabled(keyCode);
 			switch(keyCode) {
 			case KEYCODE_QWERTY_SHIFT:
@@ -212,12 +339,36 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 	class BackspaceLongClickHandler implements Runnable {
 		@Override
 		public void run() {
-			EventBus.getDefault().post(new InputSoftKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KEYCODE_NON_SHIN_DEL)));
+			if (mDisableKeyInput) return;
+			EventBus.getDefault()
+					.post(
+							new InputSoftKeyEvent(
+									new KeyEvent(KeyEvent.ACTION_DOWN, KEYCODE_NON_SHIN_DEL)));
 			mBackspaceLongClickHandler.postDelayed(new BackspaceLongClickHandler(), 50);
 		}
 	}
 
-	private SparseArray<TouchPoint> mTouchPoints = new SparseArray<>();
+	private final SparseArray<TouchPoint> mTouchPoints = new SparseArray<>();
+
+	private void cancelTouches() {
+		for (int i = 0; i < mTouchPoints.size(); i++) {
+			mTouchPoints.valueAt(i).cancel();
+		}
+		mTouchPoints.clear();
+		mBackspaceLongClickHandler.removeCallbacksAndMessages(null);
+	}
+
+	@Override
+	public void closing() {
+		cancelTouches();
+		if (mTimeoutHandler != null) {
+			mTimeoutHandler.removeCallbacksAndMessages(null);
+			mTimeoutHandler = null;
+		}
+		if (mNumKeyboardView != null) mNumKeyboardView.closing();
+		super.closing();
+	}
+
 	class TouchPoint {
 		Keyboard.Key key;
 		int keyCode;
@@ -311,17 +462,26 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 			return true;
 		}
 
-		public boolean onUp() {
-			key.onReleased(true);
+		private void finishTouch() {
 			mKeyboardView.setPreviewEnabled(false);
 			mBackspaceLongClickHandler.removeCallbacksAndMessages(null);
 			mKeyboardView.invalidateAllKeys();
 			handler.removeCallbacksAndMessages(null);
-			if(space != -1) {
+		}
+
+		public void cancel() {
+			key.pressed = false;
+			finishTouch();
+		}
+
+		public boolean onUp() {
+			key.onReleased(true);
+			finishTouch();
+			if (space != -1) {
 				space = -1;
 				return false;
 			}
-			if(backspace != -1) {
+			if (backspace != -1) {
 				EventBus.getDefault().post(new SoftKeyGestureEvent(KeyEvent.KEYCODE_DEL, SoftKeyGestureEvent.Type.RELEASE));
 				backspace = -1;
 				return false;
@@ -374,6 +534,11 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 	class OnKeyboardViewTouchListener implements View.OnTouchListener {
 		@Override
 		public boolean onTouch(View v, MotionEvent event) {
+			if (event.getActionMasked() == MotionEvent.ACTION_CANCEL || mDisableKeyInput) {
+				cancelTouches();
+				return true;
+			}
+			if (event.getActionMasked() == MotionEvent.ACTION_DOWN) cancelTouches();
 			int pointerIndex = event.getActionIndex();
 			int pointerId = event.getPointerId(pointerIndex);
 			int action = event.getActionMasked();
@@ -452,7 +617,8 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 			keyList = mKeyboard[LANG_KO][mDisplayMode][KEYBOARD_12KEY];
 
 			mCurrentKeyboardType = KEYBOARD_12KEY;
-			String defaultLayout = pref.getString("keyboard_hangul_12key_layout", "keyboard_12key_sebul_munhwa");
+			String defaultLayout =
+					pref.getString("keyboard_hangul_12key_layout", "keyboard_12key_sebul_munhwa");
 
 			switch(defaultLayout) {
 			case "keyboard_12key_dubul_cheonjiin":
@@ -513,15 +679,18 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 			mCurrentKeyboards[LANG_KO] = EngineMode.get(defaultLayout);
 
 			String softLayout = "l1.2";
-			if(mDisplayMode == PORTRAIT) softLayout = pref.getString("keyboard_hangul_soft_layout_portrait", softLayout);
+			if (mDisplayMode == PORTRAIT)
+				softLayout = pref.getString("keyboard_hangul_soft_layout_portrait", softLayout);
 			else softLayout = pref.getString("keyboard_hangul_soft_layout_landscape", softLayout);
 			loadSoftLayout(keyList, softLayout);
 
 		}
 
 		String altSoftLayout = "l1.0";
-		if(mDisplayMode == PORTRAIT) altSoftLayout = pref.getString("keyboard_symbols_soft_layout_portrait", altSoftLayout);
-		else altSoftLayout = pref.getString("keyboard_symbols_soft_layout_landscape", altSoftLayout);
+		if (mDisplayMode == PORTRAIT)
+			altSoftLayout = pref.getString("keyboard_symbols_soft_layout_portrait", altSoftLayout);
+		else
+			altSoftLayout = pref.getString("keyboard_symbols_soft_layout_landscape", altSoftLayout);
 		String altLayout = pref.getString("keyboard_symbols_layout", "keyboard_symbols_a");
 		mAltKeyMode = EngineMode.get(altLayout);
 		loadSoftLayout(keyList, KEYMODE_ALT_SYMBOLS, altSoftLayout);
@@ -532,14 +701,17 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 
 			String defaultLayout = "keyboard_alphabet_qwerty";
 			if(!mHardKeyboardHidden) {
-				defaultLayout = pref.getString("hardware_alphabet_layout", "keyboard_alphabet_qwerty");
+				defaultLayout =
+						pref.getString("hardware_alphabet_layout", "keyboard_alphabet_qwerty");
 			} else {
-				defaultLayout = pref.getString("keyboard_alphabet_layout", "keyboard_alphabet_qwerty");
+				defaultLayout =
+						pref.getString("keyboard_alphabet_layout", "keyboard_alphabet_qwerty");
 			}
 			mCurrentKeyboards[LANG_EN] = EngineMode.get(defaultLayout);
 
 			String softLayout = "l1.0";
-			if(mDisplayMode == PORTRAIT) softLayout = pref.getString("keyboard_alphabet_soft_layout_portrait", softLayout);
+			if (mDisplayMode == PORTRAIT)
+				softLayout = pref.getString("keyboard_alphabet_soft_layout_portrait", softLayout);
 			else softLayout = pref.getString("keyboard_alphabet_soft_layout_portrait", softLayout);
 			loadSoftLayout(keyList, softLayout);
 
@@ -547,7 +719,9 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 
 			keyList = mKeyboard[LANG_EN][mDisplayMode][mCurrentKeyboardType];
 
-			String defaultLayout = pref.getString("keyboard_alphabet_12key_layout", "keyboard_12key_alphabet_narrow_a");
+			String defaultLayout =
+					pref.getString(
+							"keyboard_alphabet_12key_layout", "keyboard_12key_alphabet_narrow_a");
 
 			switch(defaultLayout) {
 			case "keyboard_12key_alphabet_wide_a":
@@ -657,64 +831,76 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 	public View initView(SebeolHangulIME parent, int width, int height) {
 		mIME = parent;
 		mDisplayMode =
-				(parent.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE)
-						? LANDSCAPE : PORTRAIT;
+				(parent.getResources().getConfiguration().orientation
+								== Configuration.ORIENTATION_LANDSCAPE)
+						? LANDSCAPE
+						: PORTRAIT;
 
 		createKeyboards(parent);
 
 		final SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(parent);
-		String skin = pref.getString("keyboard_skin", mIME.getResources().getString(R.string.keyboard_skin_id_default));
+		String skin = pref.getString("keyboard_skin",
+				mIME.getResources().getString(R.string.keyboard_skin_id_default));
 		int id = parent.getResources().getIdentifier("keyboard_" + skin, "layout", parent.getPackageName());
-		if(id == 0) id = R.layout.keyboard_white;
+		if (id == 0) id = R.layout.keyboard_white;
 		mKeyboardView = (KeyboardView) mIME.getLayoutInflater().inflate(id, null);
 		mKeyboardView.setOnKeyboardActionListener(this);
 		mCurrentKeyboard = null;
-		if(mKeyboardView instanceof DefaultSoftKeyboardView) {
-			((DefaultSoftKeyboardView) mKeyboardView).setKeyboardDisplay(mKeyboardDisplays.get(skin));
+		if (mKeyboardView instanceof DefaultSoftKeyboardView) {
+			((DefaultSoftKeyboardView) mKeyboardView)
+					.setKeyboardDisplay(mKeyboardDisplays.get(skin));
 		}
 
 		mNumKeyboardView = (KeyboardView) mIME.getLayoutInflater().inflate(id, null);
 		mNumKeyboardView.setOnKeyboardActionListener(this);
 
-		mMainView = (ViewGroup) parent.getLayoutInflater().inflate(R.layout.keyboard_default_main, null);
-		mSubView = (ViewGroup) parent.getLayoutInflater().inflate(R.layout.keyboard_default_sub, null);
+		mMainView =
+				(ViewGroup)
+						parent.getLayoutInflater().inflate(R.layout.keyboard_default_main, null);
+		mSubView =
+				(ViewGroup) parent.getLayoutInflater().inflate(R.layout.keyboard_default_sub, null);
 
 		boolean initialLaunch = pref.getBoolean("initial_launch", true);
-		if(initialLaunch) {
-			final View help = parent.getLayoutInflater().inflate(R.layout.initial_launch_helper, null);
+		if (initialLaunch) {
+			final View help =
+					parent.getLayoutInflater().inflate(R.layout.initial_launch_helper, null);
 			mMainView.addView(help);
 			Button close = (Button) mMainView.findViewById(R.id.close);
-			close.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					mMainView.removeView(help);
-					SharedPreferences.Editor editor = pref.edit();
-					editor.putBoolean("initial_launch", false);
-					editor.apply();
-				}
-			});
+			close.setOnClickListener(
+					new View.OnClickListener() {
+						@Override
+						public void onClick(View v) {
+							mMainView.removeView(help);
+							SharedPreferences.Editor editor = pref.edit();
+							editor.putBoolean("initial_launch", false);
+							editor.apply();
+						}
+					});
 		}
 
 		if (!mHardKeyboardHidden) {
-			if(mShowSubView) mMainView.addView(mSubView);
-			if(mShowNumKeyboardViewPortrait && mDisplayMode == PORTRAIT) mMainView.addView(mNumKeyboardView);
-			if(mShowNumKeyboardViewLandscape && mDisplayMode == LANDSCAPE) mMainView.addView(mNumKeyboardView);
+			if (mShowSubView) mMainView.addView(mSubView);
+			if (mShowNumKeyboardViewPortrait && mDisplayMode == PORTRAIT)
+				mMainView.addView(mNumKeyboardView);
+			if (mShowNumKeyboardViewLandscape && mDisplayMode == LANDSCAPE)
+				mMainView.addView(mNumKeyboardView);
 		} else if (mKeyboardView != null) {
 			mMainView.addView(mKeyboardView);
 		}
 		mKeyboardView.setOnTouchListener(new OnKeyboardViewTouchListener());
 		mNumKeyboardView.setOnTouchListener(new OnKeyboardViewTouchListener());
 		TextView langView = mSubView.findViewById(R.id.lang);
-		langView.setOnTouchListener((v, event) -> {
-			if(event.getAction() == MotionEvent.ACTION_DOWN) {
-				if(mVibrator != null) {
-					mVibrator.vibrate(30);
-				}
-				nextLanguage();
-				updateIndicator(HARD_KEYMODE_LANG + mCurrentLanguage);
-			}
-			return false;
-		});
+		langView.setOnTouchListener(
+				(v, event) -> {
+					if (event.getAction() == MotionEvent.ACTION_DOWN) {
+						if (mVibrator != null) {
+							mVibrator.vibrate(30);
+						}
+						nextLanguage();
+						updateIndicator(HARD_KEYMODE_LANG + mCurrentLanguage);
+					}
+					return false;
+				});
 
 		return mMainView;
 	}
@@ -996,7 +1182,7 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 		}
 		mKeyboardView.setPreviewEnabled(false);
 		mNumKeyboardView.setPreviewEnabled(false);
-		boolean showNum = pref.getBoolean("hardware_use_numkeyboard", true);
+		boolean showNum = pref.getBoolean("hardware_use_numkeyboard", false);
 		if(showNum != mShowNumKeyboardViewPortrait || showNum != mShowNumKeyboardViewLandscape) {
 			mShowNumKeyboardViewLandscape = mShowNumKeyboardViewPortrait = showNum;
 			EventBus.getDefault().post(new InputViewChangeEvent());
@@ -1119,25 +1305,16 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 		SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(mIME);
 		String skin = pref.getString("keyboard_skin",
 				mIME.getResources().getString(R.string.keyboard_skin_id_default));
-		int icon = 0;
-		switch(skin) {
-		case "white":
-			icon = 1;
-			break;
-
-		default:
-			icon = 0;
-		}
 		DisplayMetrics metrics = mIME.getResources().getDisplayMetrics();
 		int height = (mDisplayMode == PORTRAIT) ? mKeyHeightPortrait : mKeyHeightLandscape;
 		height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, height, metrics);
 		keyboard.resizeHeight(height);
 		keyboard.setMargins(mMarginLeft, mMarginRight, mMarginBottom);
-		if(mOneHandedMode) {
+		if (mOneHandedMode) {
 			keyboard.oneHandedMode(mIME, mOneHandedSide, mOneHandedRatio / 100d);
 		}
 		SoftKeyboardDisplay keyboardDisplay = mKeyboardDisplays.get(skin);
-		if(keyboardDisplay != null) {
+		if (keyboardDisplay != null) {
 			for (Keyboard.Key key : keyboard.getKeys()) {
 				SoftKeyDisplay keyDisplay = keyboardDisplay.get(key.codes[0]);
 				if (keyDisplay != null) {

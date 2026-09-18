@@ -1,5 +1,6 @@
 package me.blog.hgl1002.openwnn;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.ViewGroup;
 
@@ -11,6 +12,7 @@ import androidx.core.view.OnApplyWindowInsetsListener;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
+import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
@@ -18,11 +20,13 @@ import androidx.preference.PreferenceManager;
 public class SebeolHangulIMEControlPanel extends AppCompatActivity implements PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
 
 	@Override
+	protected void attachBaseContext(Context base) {
+		super.attachBaseContext(AppLanguage.wrap(base));
+	}
+
+	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		if(SebeolHangulIME.getInstance() == null) {
-			new SebeolHangulIME(this);
-		}
 		setContentView(R.layout.activity_settings);
 		if(savedInstanceState == null) {
 			getSupportFragmentManager()
@@ -43,7 +47,7 @@ public class SebeolHangulIMEControlPanel extends AppCompatActivity implements Pr
 			view.setLayoutParams(params);
 			return WindowInsetsCompat.CONSUMED;
 		});
-    }
+	}
 
 	@Override
 	public boolean onPreferenceStartFragment(@NonNull PreferenceFragmentCompat caller, @NonNull Preference pref) {
@@ -72,7 +76,8 @@ public class SebeolHangulIMEControlPanel extends AppCompatActivity implements Pr
 	public static class HeadersFragment extends PreferenceFragmentCompat {
 		@Override
 		public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
-			if(PreferenceManager.getDefaultSharedPreferences(getContext()).getBoolean("reveal_dev_settings", false)) {
+			if (PreferenceManager.getDefaultSharedPreferences(getContext())
+					.getBoolean("reveal_dev_settings", false)) {
 				setPreferencesFromResource(R.xml.openwnn_pref_ko_headers_dev, rootKey);
 			} else {
 				setPreferencesFromResource(R.xml.openwnn_pref_ko_headers, rootKey);
@@ -112,6 +117,16 @@ public class SebeolHangulIMEControlPanel extends AppCompatActivity implements Pr
 		@Override
 		public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
 			setPreferencesFromResource(R.xml.openwnn_pref_ko_system, rootKey);
+			ListPreference language = findPreference(AppLanguage.PREFERENCE);
+			if (language != null) {
+				language.setValue(AppLanguage.selected(requireContext()));
+				language.setSummaryProvider(ListPreference.SimpleSummaryProvider.getInstance());
+				language.setOnPreferenceChangeListener(
+						(preference, value) -> {
+							AppLanguage.select(requireContext(), (String) value);
+							return true;
+						});
+			}
 		}
 	}
 
