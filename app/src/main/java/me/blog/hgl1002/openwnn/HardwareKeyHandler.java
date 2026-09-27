@@ -13,6 +13,12 @@ import java.util.Map;
 
 /** Owns hardware press/release pairs independently of the software keyboard view. */
 public final class HardwareKeyHandler {
+    public enum KeyDisposition {
+        TEXT,
+        PASS_THROUGH,
+        CONSUMED
+    }
+
     public interface Listener {
         void finishComposition();
 
@@ -26,7 +32,7 @@ public final class HardwareKeyHandler {
     private final Map<Long, Press> presses = new HashMap<>();
     private KeystrokePreference.KeyStroke languageKey =
             KeystrokePreference.parseKeyStroke("---s62");
-    private HardwareShortcutMapper mapper = new HardwareShortcutMapper("", false);
+    private HardwareKeyMapper mapper = new HardwareKeyMapper("", false);
     private String shortAction = SebeolHangulIME.LANGKEY_SWITCH_KOR_ENG;
     private String longAction = SebeolHangulIME.LANGKEY_LIST_METHODS;
     private int longPressTimeout = ViewConfiguration.getLongPressTimeout();
@@ -57,7 +63,7 @@ public final class HardwareKeyHandler {
                                 ViewConfiguration.getLongPressTimeout()));
         rightAltSymbols = preferences.getBoolean("hardware_alt_direct", true);
         mapper =
-                new HardwareShortcutMapper(
+                new HardwareKeyMapper(
                         preferences.getString(
                                 "hardware_alphabet_layout", "keyboard_alphabet_qwerty"),
                         "qwerty"
@@ -76,42 +82,49 @@ public final class HardwareKeyHandler {
         return event.isCtrlPressed() || event.isMetaPressed() || (event.isAltPressed() && !altGr);
     }
 
-    public boolean onKeyDown(KeyEvent event) {
+    public KeyDisposition onKeyDown(KeyEvent event, boolean textEditor) {
         long identity = identity(event);
         Press previous = presses.get(identity);
         if (event.getRepeatCount() > 0
                 && previous != null
-                && (previous.forwarded || previous.suppressRepeat)) {
+                && previous.disposition != KeyDisposition.TEXT) {
             if (previous.forwarded)
-                listener.sendKeyEvent(HardwareShortcutMapper.withKeyCode(event, previous.keyCode));
-            return true;
+                listener.sendKeyEvent(HardwareKeyMapper.withKeyCode(event, previous.keyCode));
+            return previous.disposition;
         }
         presses.remove(identity);
         if (languageKey.matches(event)) {
             if (event.getRepeatCount() == 0) {
                 cancelLanguagePress();
                 listener.finishComposition();
-                presses.put(identity, new Press(event.getKeyCode(), false, true));
+                presses.put(
+                        identity, new Press(event.getKeyCode(), KeyDisposition.CONSUMED, false));
                 languagePress =
                         new LanguagePress(identity, event.getDeviceId(), shortAction, longAction);
                 handler.postDelayed(languagePress, longPressTimeout);
             }
-            return true;
+            return KeyDisposition.CONSUMED;
         }
         if (!KeyEvent.isModifierKey(event.getKeyCode()) || !languageKey.matchesModifiers(event))
             cancelLanguagePress();
-        if (!isShortcut(event)) return false;
+        if (textEditor && !isShortcut(event)) return KeyDisposition.TEXT;
+        if (KeyEvent.isModifierKey(event.getKeyCode())) return KeyDisposition.PASS_THROUGH;
         listener.finishComposition();
         int mappedCode = mapper.mapKeyCode(event.getKeyCode());
-        if (mappedCode == event.getKeyCode()) return false;
-        if (!listener.sendKeyEvent(HardwareShortcutMapper.withKeyCode(event, mappedCode)))
-            return false;
-        presses.put(identity, new Press(mappedCode, true, false));
-        return true;
+        if (mappedCode == event.getKeyCode()
+                || !listener.sendKeyEvent(HardwareKeyMapper.withKeyCode(event, mappedCode))) {
+            // Remember unchanged presses too: a focus/layout change during a hold must not
+            // turn subsequent repeats into text or remap only the release.
+            presses.put(
+                    identity, new Press(event.getKeyCode(), KeyDisposition.PASS_THROUGH, false));
+            return KeyDisposition.PASS_THROUGH;
+        }
+        presses.put(identity, new Press(mappedCode, KeyDisposition.CONSUMED, true));
+        return KeyDisposition.CONSUMED;
     }
 
     public void consume(KeyEvent event) {
-        presses.put(identity(event), new Press(event.getKeyCode(), false, false));
+        presses.put(identity(event), new Press(event.getKeyCode(), KeyDisposition.TEXT, false));
     }
 
     public boolean onKeyUp(KeyEvent event) {
@@ -129,8 +142,8 @@ public final class HardwareKeyHandler {
         }
         if (press == null) return false;
         if (press.forwarded)
-            listener.sendKeyEvent(HardwareShortcutMapper.withKeyCode(event, press.keyCode));
-        return true;
+            listener.sendKeyEvent(HardwareKeyMapper.withKeyCode(event, press.keyCode));
+        return press.disposition != KeyDisposition.PASS_THROUGH;
     }
 
     public void cancelLanguagePress() {
@@ -149,13 +162,13 @@ public final class HardwareKeyHandler {
 
     private static final class Press {
         private final int keyCode;
+        private final KeyDisposition disposition;
         private final boolean forwarded;
-        private final boolean suppressRepeat;
 
-        private Press(int keyCode, boolean forwarded, boolean suppressRepeat) {
+        private Press(int keyCode, KeyDisposition disposition, boolean forwarded) {
             this.keyCode = keyCode;
+            this.disposition = disposition;
             this.forwarded = forwarded;
-            this.suppressRepeat = suppressRepeat;
         }
     }
 

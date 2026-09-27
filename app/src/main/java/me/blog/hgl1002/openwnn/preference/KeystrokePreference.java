@@ -11,7 +11,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.Preference;
 
-import me.blog.hgl1002.openwnn.HardwareShortcutMapper;
+import me.blog.hgl1002.openwnn.HardwareKeyMapper;
 import me.blog.hgl1002.openwnn.R;
 
 public class KeystrokePreference extends Preference {
@@ -164,7 +164,7 @@ public class KeystrokePreference extends Preference {
 		}
 
 		public boolean matchesModifiers(KeyEvent event) {
-			KeyStroke modifiers = fromEvent(HardwareShortcutMapper.withKeyCode(event, keyCode));
+			KeyStroke modifiers = fromEvent(HardwareKeyMapper.withKeyCode(event, keyCode));
 			return control == modifiers.control
 					&& alt == modifiers.alt
 					&& win == modifiers.win

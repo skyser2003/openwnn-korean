@@ -1060,8 +1060,19 @@ public class SebeolHangulIME extends InputMethodService
 		mInputConnection = getCurrentInputConnection();
 		if (mPreparedInputView == null && mInputConnection == null)
 			return super.onKeyDown(keyCode, event);
-		if (mHardwareKeys.onKeyDown(event)) return true;
-		if (mHardwareKeys.isShortcut(event)) return super.onKeyDown(keyCode, event);
+		EditorInfo editor = getCurrentInputEditorInfo();
+		// A hidden keyboard can still have an active text editor. TYPE_NULL connections
+		// instead expect raw keys, including single-key commands on a drawing canvas.
+		boolean textEditor =
+				getCurrentInputStarted()
+						&& mInputConnection != null
+						&& editor != null
+						&& (editor.inputType & android.text.InputType.TYPE_MASK_CLASS)
+								!= android.text.InputType.TYPE_NULL;
+		HardwareKeyHandler.KeyDisposition disposition = mHardwareKeys.onKeyDown(event, textEditor);
+		if (disposition == HardwareKeyHandler.KeyDisposition.CONSUMED) return true;
+		if (disposition == HardwareKeyHandler.KeyDisposition.PASS_THROUGH)
+			return super.onKeyDown(keyCode, event);
 		if (mTimeOutHandler == null && !KeyEvent.isModifierKey(keyCode)) {
 			mTimeOutHandler = new Handler(Looper.getMainLooper());
 			mTimeOutHandler.postDelayed(

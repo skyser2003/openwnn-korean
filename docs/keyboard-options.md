@@ -23,9 +23,12 @@ Under **Hardware keyboard**:
   and indicator strip while a physical keyboard is available. Composition and
   hardware language switching remain active. Disconnecting the keyboard restores
   the software keyboard for the current text editor.
-- **Shortcut layout** defaults to **Follow hardware alphabet layout**. Colemak
-  and Dvorak use their alphabet mappings for Ctrl, Alt, and Meta shortcuts, even
-  when typing Korean. **QWERTY key positions** preserves physical QWERTY shortcuts.
+- **Non-text input layout** defaults to **Follow hardware alphabet layout**.
+  Colemak and Dvorak use their alphabet mappings for app controls, including
+  single-key and Shift-key commands outside text fields and Ctrl, Alt, and Meta
+  shortcuts. **QWERTY key positions** preserves the original QWERTY keys for these
+  controls. Both choices apply in English and Korean modes; text entry still
+  uses the selected typing layout. Existing shortcut-layout selections are kept.
 - **Right Alt types symbols** preserves right-Alt character entry. Left Alt is
   available for application shortcuts. Disable this setting to use right Alt for
   shortcuts too. Ctrl+Alt combinations remain shortcuts.
@@ -39,9 +42,13 @@ the modifier checkboxes can also be edited before tapping OK.
 
 For an alphabet layout configured inside this app, keep Android's physical
 keyboard layout at QWERTY. Applying Colemak or Dvorak in both places would map
-ordinary characters twice. An input method can only remap shortcuts Android
-delivers to it; shortcuts intercepted by the system or before IME dispatch are
-outside this setting's control.
+ordinary characters twice. The IME uses the active editor information, not the
+visibility of its keyboard, to distinguish text entry from app controls. Views
+without an active editor and `TYPE_NULL` connections use key events. Custom apps
+that report a text editor while showing a canvas cannot always be distinguished
+automatically; legacy text fields using `TYPE_NULL` also follow the non-text
+layout. An input method can only remap keys Android delivers to it; keys
+intercepted by the system or before IME dispatch are outside this setting's control.
 
 ## Building and testing
 
@@ -59,7 +66,7 @@ same signing key; preserve existing settings before replacing a differently
 signed installation.
 
 Host tests cover hidden input sessions and editor changes on Android API 28 and
-33, interface localization on API 21/28/33, shortcut event pairs and repeats,
+33, interface localization on API 21/28/33, non-text event pairs and repeats,
 composition, and language-key capture and short/long presses.
 Theme tests cover system changes and explicit choices on API 21/28/33/35,
 including navigation contrast, hardware indicators, and the transparent area
@@ -77,8 +84,11 @@ Device checks still needed for app-specific behavior:
 1. With Colemak selected inside the IME, test Chrome Alt+D using the physical
    QWERTY G key. Confirm that the address bar receives focus and no character is
    inserted. Test both an already-focused text editor and a page without one.
-2. Select QWERTY shortcuts and repeat using physical D. Test Ctrl shortcuts and
-   switching between Korean and English input.
+2. Select QWERTY under Non-text input layout and repeat using physical D. Test
+   Ctrl shortcuts and switching between Korean and English input. In a drawing
+   app, test single-key and Shift-key commands on the canvas under both choices,
+   then open a text field and verify that Colemak typing still works. Hold a
+   command key while switching focus and check that repeats/releases stay paired.
 3. Connect/disconnect the hardware keyboard, rotate the device, and switch text
    fields with complete hiding enabled. Check for leftover keyboard space.
 4. Assign Shift+Space, Ctrl+Space, and Alt+Space in turn. Verify short and long

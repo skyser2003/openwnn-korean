@@ -48,7 +48,7 @@ public class HardwareKeyHandlerTest {
     @Test
     public void colemakAltDForwardsMatchingPressAndReleaseWithoutText() {
         KeyEvent down = event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_G, KeyEvent.META_ALT_ON);
-        assertTrue(keys.onKeyDown(down));
+        assertTrue(handleInTextEditor(down));
         assertTrue(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_G, 0)));
         assertEquals(2, listener.events.size());
         KeyEvent forwarded = listener.events.get(0);
@@ -69,7 +69,7 @@ public class HardwareKeyHandlerTest {
         preferences.edit().putString("hardware_shortcut_layout", "qwerty").apply();
         keys.configure(preferences);
         assertFalse(
-                keys.onKeyDown(
+                handleInTextEditor(
                         event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_D, KeyEvent.META_ALT_ON)));
         assertTrue(listener.events.isEmpty());
         assertEquals(1, listener.compositionFinishes);
@@ -78,15 +78,14 @@ public class HardwareKeyHandlerTest {
     @Test
     public void ctrlShiftAndMetaShortcutsUseAlphabetMapping() {
         int modifiers = KeyEvent.META_CTRL_ON | KeyEvent.META_SHIFT_ON | KeyEvent.META_META_ON;
-        assertTrue(keys.onKeyDown(event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_K, modifiers)));
+        assertTrue(handleInTextEditor(event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_K, modifiers)));
         assertEquals(KeyEvent.KEYCODE_E, listener.events.get(0).getKeyCode());
         assertEquals(modifiers, listener.events.get(0).getMetaState());
     }
 
     @Test
     public void dvorakMapsPunctuationAndKeepsShift() {
-        HardwareShortcutMapper mapper =
-                new HardwareShortcutMapper("keyboard_alphabet_dvorak", false);
+        HardwareKeyMapper mapper = new HardwareKeyMapper("keyboard_alphabet_dvorak", false);
         assertEquals(KeyEvent.KEYCODE_APOSTROPHE, mapper.mapKeyCode(KeyEvent.KEYCODE_Q));
         assertEquals(KeyEvent.KEYCODE_S, mapper.mapKeyCode(KeyEvent.KEYCODE_SEMICOLON));
         assertEquals(KeyEvent.KEYCODE_LEFT_BRACKET, mapper.mapKeyCode(KeyEvent.KEYCODE_MINUS));
@@ -97,10 +96,10 @@ public class HardwareKeyHandlerTest {
     public void ordinaryTypingRepeatsAndOverlappingReleasesStayIndependent() {
         KeyEvent a = event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0);
         keys.consume(a);
-        assertFalse(keys.onKeyDown(KeyEvent.changeTimeRepeat(a, 200, 1)));
+        assertFalse(handleInTextEditor(KeyEvent.changeTimeRepeat(a, 200, 1)));
         keys.consume(a);
         assertFalse(
-                keys.onKeyDown(
+                handleInTextEditor(
                         event(
                                 KeyEvent.ACTION_DOWN,
                                 KeyEvent.KEYCODE_CTRL_LEFT,
@@ -118,7 +117,7 @@ public class HardwareKeyHandlerTest {
                 .apply();
         keys.configure(preferences);
         assertTrue(
-                keys.onKeyDown(
+                handleInTextEditor(
                         event(
                                 KeyEvent.ACTION_DOWN,
                                 KeyEvent.KEYCODE_SPACE,
@@ -136,10 +135,10 @@ public class HardwareKeyHandlerTest {
     @Test
     public void holdingLanguageCombinationRunsLongActionOnceWithoutShortActionOrSpace() {
         KeyEvent down = event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, KeyEvent.META_SHIFT_ON);
-        assertTrue(keys.onKeyDown(down));
+        assertTrue(handleInTextEditor(down));
         advance(501);
-        assertTrue(keys.onKeyDown(KeyEvent.changeTimeRepeat(down, 600, 1)));
-        assertTrue(keys.onKeyDown(KeyEvent.changeTimeRepeat(down, 700, 2)));
+        assertTrue(handleInTextEditor(KeyEvent.changeTimeRepeat(down, 600, 1)));
+        assertTrue(handleInTextEditor(KeyEvent.changeTimeRepeat(down, 700, 2)));
         assertTrue(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE, 0)));
         advance(1000);
         assertEquals(1, listener.actions.size());
@@ -152,7 +151,7 @@ public class HardwareKeyHandlerTest {
         preferences.edit().putString("system_hardware_lang_key_stroke", "c---62").apply();
         keys.configure(preferences);
         assertTrue(
-                keys.onKeyDown(
+                handleInTextEditor(
                         event(
                                 KeyEvent.ACTION_DOWN,
                                 KeyEvent.KEYCODE_SPACE,
@@ -166,7 +165,8 @@ public class HardwareKeyHandlerTest {
 
     @Test
     public void releasingModifierFirstCompletesShortActionOnce() {
-        keys.onKeyDown(event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, KeyEvent.META_SHIFT_ON));
+        handleInTextEditor(
+                event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, KeyEvent.META_SHIFT_ON));
         advance(100);
         assertFalse(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0)));
         advance(600);
@@ -177,7 +177,8 @@ public class HardwareKeyHandlerTest {
 
     @Test
     public void leavingEditorCancelsPendingActionButKeepsConsumedRelease() {
-        keys.onKeyDown(event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, KeyEvent.META_SHIFT_ON));
+        handleInTextEditor(
+                event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, KeyEvent.META_SHIFT_ON));
         keys.cancelLanguagePress();
         advance(600);
         assertTrue(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE, 0)));
@@ -186,7 +187,7 @@ public class HardwareKeyHandlerTest {
 
     @Test
     public void layoutChangeDuringShortcutKeepsOriginalReleaseMapping() {
-        keys.onKeyDown(event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_G, KeyEvent.META_ALT_ON));
+        handleInTextEditor(event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_G, KeyEvent.META_ALT_ON));
         preferences.edit().putString("hardware_shortcut_layout", "qwerty").apply();
         keys.configure(preferences);
         keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_G, 0));
@@ -221,9 +222,72 @@ public class HardwareKeyHandlerTest {
     public void failedForwardingLeavesOriginalEventAvailableToApplication() {
         listener.acceptEvents = false;
         assertFalse(
-                keys.onKeyDown(
+                handleInTextEditor(
                         event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_G, KeyEvent.META_ALT_ON)));
         assertFalse(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_G, 0)));
+    }
+
+    @Test
+    public void nonTextRepeatAndReleaseKeepMappingAfterLayoutAndFocusChange() {
+        KeyEvent down = event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_G, KeyEvent.META_SHIFT_ON);
+        assertEquals(HardwareKeyHandler.KeyDisposition.CONSUMED, keys.onKeyDown(down, false));
+        preferences.edit().putString("hardware_shortcut_layout", "qwerty").apply();
+        keys.configure(preferences);
+        assertEquals(
+                HardwareKeyHandler.KeyDisposition.CONSUMED,
+                keys.onKeyDown(KeyEvent.changeTimeRepeat(down, 200, 1), true));
+        assertTrue(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_G, 0)));
+        assertEquals(3, listener.events.size());
+        for (KeyEvent forwarded : listener.events) {
+            assertEquals(KeyEvent.KEYCODE_D, forwarded.getKeyCode());
+        }
+        assertEquals(1, listener.events.get(1).getRepeatCount());
+        assertEquals(KeyEvent.META_SHIFT_ON, listener.events.get(1).getMetaState());
+        assertEquals(KeyEvent.ACTION_UP, listener.events.get(2).getAction());
+    }
+
+    @Test
+    public void unchangedNonTextPressDoesNotStartMappingPartwayThroughHold() {
+        preferences.edit().putString("hardware_shortcut_layout", "qwerty").apply();
+        keys.configure(preferences);
+        KeyEvent down = event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_G, 0);
+        assertEquals(HardwareKeyHandler.KeyDisposition.PASS_THROUGH, keys.onKeyDown(down, false));
+        preferences.edit().putString("hardware_shortcut_layout", "layout").apply();
+        keys.configure(preferences);
+        assertEquals(
+                HardwareKeyHandler.KeyDisposition.PASS_THROUGH,
+                keys.onKeyDown(KeyEvent.changeTimeRepeat(down, 200, 1), false));
+        assertFalse(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_G, 0)));
+        assertTrue(listener.events.isEmpty());
+    }
+
+    @Test
+    public void failedNonTextForwardingDoesNotFallBackToText() {
+        listener.acceptEvents = false;
+        KeyEvent down = event(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_G, 0);
+        assertEquals(HardwareKeyHandler.KeyDisposition.PASS_THROUGH, keys.onKeyDown(down, false));
+        assertEquals(
+                HardwareKeyHandler.KeyDisposition.PASS_THROUGH,
+                keys.onKeyDown(KeyEvent.changeTimeRepeat(down, 200, 1), true));
+        assertFalse(keys.onKeyUp(event(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_G, 0)));
+        assertEquals(1, listener.events.size());
+    }
+
+    @Test
+    public void rightAltOnlyProducesTextWhenThereIsATextEditor() {
+        KeyEvent down =
+                event(
+                        KeyEvent.ACTION_DOWN,
+                        KeyEvent.KEYCODE_G,
+                        KeyEvent.META_ALT_ON | KeyEvent.META_ALT_RIGHT_ON);
+        assertEquals(HardwareKeyHandler.KeyDisposition.TEXT, keys.onKeyDown(down, true));
+        assertEquals(HardwareKeyHandler.KeyDisposition.CONSUMED, keys.onKeyDown(down, false));
+        assertEquals(KeyEvent.KEYCODE_D, listener.events.get(0).getKeyCode());
+        assertEquals(down.getMetaState(), listener.events.get(0).getMetaState());
+    }
+
+    private boolean handleInTextEditor(KeyEvent event) {
+        return keys.onKeyDown(event, true) == HardwareKeyHandler.KeyDisposition.CONSUMED;
     }
 
     private static KeyEvent event(int action, int code, int modifiers) {

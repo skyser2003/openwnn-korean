@@ -4,12 +4,12 @@ import android.view.KeyEvent;
 
 import me.blog.hgl1002.openwnn.layout.LayoutAlphabet;
 
-/** Translates shortcut key codes using the same alphabet tables as ordinary typing. */
-public final class HardwareShortcutMapper {
+/** Translates non-text key codes using the same alphabet tables as ordinary typing. */
+public final class HardwareKeyMapper {
     private final int[][] layout;
 
-    public HardwareShortcutMapper(String alphabetLayout, boolean qwertyShortcuts) {
-        if (qwertyShortcuts) {
+    public HardwareKeyMapper(String alphabetLayout, boolean qwertyKeys) {
+        if (qwertyKeys) {
             layout = new int[0][];
         } else if ("keyboard_alphabet_colemak".equals(alphabetLayout)) {
             layout = LayoutAlphabet.CONVERT_ENGLISH_COLEMAK;

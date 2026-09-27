@@ -4,8 +4,8 @@
     <string name="preference_app_language_system">시스템 기본값</string>
     <string name="preference_hardware_hide_keyboard_title">소프트웨어 키보드 완전히 숨기기</string>
     <string name="preference_hardware_hide_keyboard_summary">하드웨어 키보드가 연결되어 있으면 화면 키보드, 숫자판, 상태 표시줄을 숨깁니다. 하드웨어 입력은 계속 사용할 수 있습니다.</string>
-    <string name="preference_hardware_shortcut_layout_title">단축키 배열</string>
-    <string name="preference_hardware_shortcut_layout_summary">이 키보드에 전달되는 Ctrl, Alt, Meta 단축키의 배열을 선택합니다. 한글과 영문 입력 모두에 적용됩니다.</string>
+    <string name="preference_hardware_shortcut_layout_title">문자 입력 외 키 배열</string>
+    <string name="preference_hardware_shortcut_layout_summary">문자 입력란 밖에서 누르는 단일 키 명령과 Ctrl, Alt, Meta 단축키 등 앱 조작에 사용할 배열을 선택합니다. 한글과 영문 모드 모두에 적용되며, 문자 입력에는 선택한 입력 배열을 계속 사용합니다.</string>
     <string name="preference_hardware_shortcut_layout_follow">하드웨어 영문 배열 따르기</string>
     <string name="preference_hardware_shortcut_layout_qwerty">QWERTY 키 위치 사용</string>
 </resources>
