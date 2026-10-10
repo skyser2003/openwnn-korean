@@ -20,6 +20,8 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.preference.PreferenceManager;
 
+import me.blog.hgl1002.openwnn.event.InputViewChangeEvent;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -99,6 +101,75 @@ public class KeyboardNavigationTest {
             decor.dispatchApplyWindowInsets(navigation(0, 0, 48));
             assertEquals(keyboardHeight + 48, measureInput());
         }
+    }
+
+    @Test
+    public void reopeningRecoversPaddingWithoutAnotherInsetCallback() {
+        int keyboardHeight = measureInput();
+        decor.dispatchApplyWindowInsets(navigation(0, 0, 48));
+        for (int repeat = 0; repeat < 3; repeat++) {
+            ime.hideWindow();
+            input.setPadding(0, 0, 0, 0);
+            ime.onWindowShown();
+            assertEquals(48, input.getPaddingBottom());
+            assertEquals(keyboardHeight + 48, measureInput());
+        }
+    }
+
+    @Test
+    public void replacingInputViewReusesInsetsWithoutAnotherCallback() {
+        decor.dispatchApplyWindowInsets(navigation(0, 0, 48));
+        View oldInput = input;
+        ime.onInputViewChange(new InputViewChangeEvent());
+        input = (ViewGroup) ime.onCreateInputView();
+        assertNotSame(oldInput, input);
+        assertEquals(48, input.getPaddingBottom());
+        decor.dispatchApplyWindowInsets(navigation(0, 0, 20));
+        assertEquals(20, input.getPaddingBottom());
+        assertEquals(48, oldInput.getPaddingBottom());
+    }
+
+    @Test
+    @Config(sdk = {33, 35})
+    public void visibleBarWithEmptyCurrentInsetsKeepsStableSpace() {
+        WindowInsets temporarilyEmpty =
+                new WindowInsets.Builder(navigation(0, 0, 48))
+                        .setInsets(WindowInsets.Type.navigationBars(), android.graphics.Insets.NONE)
+                        .setVisible(WindowInsets.Type.navigationBars(), true)
+                        .build();
+        decor.dispatchApplyWindowInsets(temporarilyEmpty);
+        assertEquals(48, input.getPaddingBottom());
+        ime.onWindowShown();
+        assertEquals(48, input.getPaddingBottom());
+    }
+
+    @Test
+    @Config(sdk = {33, 35})
+    public void actuallyHiddenBarDoesNotKeepStableSpace() {
+        decor.dispatchApplyWindowInsets(navigation(0, 0, 48));
+        WindowInsets hidden =
+                new WindowInsets.Builder(navigation(0, 0, 48))
+                        .setInsets(WindowInsets.Type.navigationBars(), android.graphics.Insets.NONE)
+                        .setVisible(WindowInsets.Type.navigationBars(), false)
+                        .build();
+        decor.dispatchApplyWindowInsets(hidden);
+        ime.onWindowShown();
+        assertEquals(0, input.getPaddingBottom());
+    }
+
+    @Test
+    @Config(sdk = {33, 35})
+    public void visibleCaptionWithEmptyInsetsUsesItsOwnStableSpace() {
+        WindowInsets insets =
+                new WindowInsets.Builder(navigation(0, 0, 24))
+                        .setInsets(WindowInsets.Type.captionBar(), android.graphics.Insets.NONE)
+                        .setInsetsIgnoringVisibility(
+                                WindowInsets.Type.captionBar(),
+                                android.graphics.Insets.of(0, 0, 0, 48))
+                        .setVisible(WindowInsets.Type.captionBar(), true)
+                        .build();
+        decor.dispatchApplyWindowInsets(insets);
+        assertEquals(48, input.getPaddingBottom());
     }
 
     @Test

@@ -16,6 +16,11 @@ The keys sit above Android's navigation controls. Spacing follows the current
 navigation/caption bar inset (including gesture mode and landscape side bars),
 and disappears when no bar space is needed. Space already reserved by Android
 is not added a second time.
+Navigation spacing is restored from the available window insets when the input
+view is attached, replaced, or reopened. After layout, the keyboard checks how
+much space its ancestors actually reserve and adds only the missing amount.
+A visible navigation/caption bar with temporarily empty insets uses its stable
+size on Android 11 and later; genuinely hidden bars do not keep that space.
 
 Under **Hardware keyboard**:
 
@@ -78,6 +83,10 @@ tap handling without needing a new editor session.
 Navigation layout tests on API 21/28/33/35 check key bounds above system buttons,
 gesture/hidden navigation, side bars, repeated inset delivery, and spacing
 already reserved by the window. API 33/35 also cover the IME caption bar.
+Recovery tests cover reopening without another inset callback, replacing the
+input view, visible bars with temporarily empty insets, and ancestor spacing
+changing without another inset dispatch. They check both missing and duplicate
+padding and ensure layout listeners are removed when the controller closes.
 
 Device checks still needed for app-specific behavior:
 
@@ -100,7 +109,9 @@ Device checks still needed for app-specific behavior:
    Check that the bottom key row is above the system buttons with no duplicate gap.
 6. In Chrome, focus a text field, type, dismiss the keyboard, and tap the same
    field to reopen it. Repeat several times and check that single taps still
-   type and long presses perform their configured action only once.
+   type and long presses perform their configured action only once. In portrait
+   mode with three-button navigation, also switch between Chrome and another
+   app and verify that the bottom key row remains above the system controls.
 
 The original revision has 40 Android lint errors (missing Korean translations
 and an indentation issue in the composition engine). These are separate from

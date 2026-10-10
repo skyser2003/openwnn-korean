@@ -22,6 +22,13 @@ final class KeyboardWindowBackground extends Drawable {
         paint.setColor(color);
     }
 
+    void setColor(int color) {
+        if (paint.getColor() != color) {
+            paint.setColor(color);
+            invalidateSelf();
+        }
+    }
+
     @RequiresApi(21)
     void updateInsets(WindowInsets insets) {
         Insets navigation = KeyboardNavigationInsets.read(insets);

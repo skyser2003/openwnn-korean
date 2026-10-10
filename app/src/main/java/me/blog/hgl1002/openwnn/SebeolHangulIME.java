@@ -38,6 +38,7 @@ import me.blog.hgl1002.openwnn.hangul.HangulEngine.HangulEngineListener;
 import me.blog.hgl1002.openwnn.hangul.HangulEngine.SetComposingEvent;
 import me.blog.hgl1002.openwnn.hangul.TwelveHangulEngine;
 import me.blog.hgl1002.openwnn.view.DefaultSoftKeyboard;
+import me.blog.hgl1002.openwnn.view.KeyboardNavigationInsets;
 import me.blog.hgl1002.openwnn.view.KeyboardTheme;
 import me.blog.hgl1002.openwnn.view.ListLangKeyActionDialogActivity;
 
@@ -62,6 +63,7 @@ public class SebeolHangulIME extends InputMethodService
 	protected boolean mAutoHideMode = true;
 
 	private View mPreparedInputView;
+	private KeyboardNavigationInsets mNavigationInsets;
 	private Resources mLocalizedResources;
 	private SharedPreferences mPreferences;
 	private final Handler mSettingsHandler = new Handler(Looper.getMainLooper());
@@ -374,6 +376,7 @@ public class SebeolHangulIME extends InputMethodService
 
 	@Override
 	public void onConfigurationChanged(Configuration newConfig) {
+		resetNavigationInsets();
 		mHardwareKeys.reset();
 		mInputViewManager.closing();
 		mPreparedInputView = null;
@@ -1034,6 +1037,7 @@ public class SebeolHangulIME extends InputMethodService
 
 	@Override
 	public void onDestroy() {
+		resetNavigationInsets();
 		mInputViewManager.closing();
 		mSettingsHandler.removeCallbacksAndMessages(null);
 		mHardwareKeys.reset();
@@ -1051,8 +1055,21 @@ public class SebeolHangulIME extends InputMethodService
 	}
 
 	private void updateNavigationBar() {
-		KeyboardTheme.resolve(this)
-				.applyToWindow(this, getWindow().getWindow(), mPreparedInputView);
+		if (Build.VERSION.SDK_INT < 21) return;
+		KeyboardTheme theme = KeyboardTheme.resolve(this);
+		theme.applyToWindow(this, getWindow().getWindow());
+		int background = theme.getBackgroundColor(this);
+		if (mNavigationInsets == null) {
+			mNavigationInsets = new KeyboardNavigationInsets(getWindow().getWindow(), background);
+		}
+		mNavigationInsets.update(mPreparedInputView, background);
+	}
+
+	private void resetNavigationInsets() {
+		if (Build.VERSION.SDK_INT >= 21 && mNavigationInsets != null) {
+			mNavigationInsets.close();
+			mNavigationInsets = null;
+		}
 	}
 
 	@Override
