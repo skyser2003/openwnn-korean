@@ -1,4 +1,19 @@
 apply plugin: 'com.android.application'
+
+def apkVersionName = providers.gradleProperty('releaseVersionName').getOrElse('250908-01')
+def apkVersionCode = providers.gradleProperty('releaseVersionCode').getOrElse('25090801').toInteger()
+def releaseKeystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+if (apkVersionCode < 1 || apkVersionCode > 2100000000) {
+    throw new GradleException('releaseVersionCode must be between 1 and 2100000000')
+}
+if (releaseKeystorePath) {
+    ['ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD'].each { name ->
+        if (!System.getenv(name)) {
+            throw new GradleException("Missing release signing environment variable: ${name}")
+        }
+    }
+}
+
 android {
     namespace = 'me.blog.hgl1002.openwnn'
     compileSdk = 36
@@ -7,16 +22,30 @@ android {
         applicationId = "me.blog.hgl1002.openwnn"
         minSdk = 14
         targetSdk = 36
-        versionCode = 25090801
-        versionName = "250908-01"
+        versionCode = apkVersionCode
+        versionName = apkVersionName
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_1_8
             targetCompatibility = JavaVersion.VERSION_1_8
         }
     }
 
+    signingConfigs {
+        if (releaseKeystorePath) {
+            release {
+                storeFile = file(releaseKeystorePath)
+                storePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias = System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseKeystorePath) {
+                signingConfig = signingConfigs.release
+            }
             minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
@@ -40,6 +69,12 @@ android {
         implementation 'org.greenrobot:eventbus:3.3.1'
         testImplementation 'junit:junit:4.13.2'
         testImplementation 'org.robolectric:robolectric:4.14.1'
+    }
+}
+
+tasks.register('printReleaseVersionCode') {
+    doLast {
+        println android.defaultConfig.versionCode
     }
 }
 
