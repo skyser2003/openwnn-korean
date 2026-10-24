@@ -9,12 +9,13 @@ import android.view.WindowInsets;
 import androidx.annotation.RequiresApi;
 import androidx.core.graphics.Insets;
 
-/** Keeps the input view above navigation across inset dispatch, attachment, and relayout. */
+/** Keeps the input view above navigation across inset dispatch, attachment, and drawing. */
 @RequiresApi(21)
 public final class KeyboardNavigationInsets
         implements View.OnApplyWindowInsetsListener,
                 View.OnAttachStateChangeListener,
-                ViewTreeObserver.OnGlobalLayoutListener {
+                ViewTreeObserver.OnGlobalLayoutListener,
+                ViewTreeObserver.OnPreDrawListener {
     private final View decor;
     private final KeyboardWindowBackground surface;
     private final Runnable refreshAfterAttach = this::refresh;
@@ -23,6 +24,7 @@ public final class KeyboardNavigationInsets
     private View inputView;
     private WindowInsets lastInsets;
     private ViewTreeObserver observedTree;
+    private boolean paddingNeedsLayout;
     private boolean closed;
 
     public KeyboardNavigationInsets(Window window, int background) {
@@ -38,6 +40,7 @@ public final class KeyboardNavigationInsets
         if (inputView != input) {
             if (inputView != null) inputView.removeOnAttachStateChangeListener(this);
             inputView = input;
+            paddingNeedsLayout = false;
             if (inputView != null) inputView.addOnAttachStateChangeListener(this);
         }
         surface.setColor(background);
@@ -86,6 +89,22 @@ public final class KeyboardNavigationInsets
 
     @Override
     public void onGlobalLayout() {
+        reconcilePadding();
+    }
+
+    @Override
+    public boolean onPreDraw() {
+        // Global layout need not run on a draw-only traversal. If newer window state needs
+        // more space, let the requested layout finish before displaying the affected keys.
+        reconcilePadding();
+        return inputView == null
+                || !inputView.isAttachedToWindow()
+                || !inputView.isShown()
+                || !paddingNeedsLayout
+                || !inputView.isLayoutRequested();
+    }
+
+    private boolean reconcilePadding() {
         if (closed
                 || inputView == null
                 || !inputView.isAttachedToWindow()
@@ -94,9 +113,11 @@ public final class KeyboardNavigationInsets
                 || decor.getWidth() == 0
                 || decor.getHeight() == 0
                 || inputView.getWidth() == 0
-                || inputView.getHeight() == 0) return;
+                || inputView.getHeight() == 0) return false;
+        paddingNeedsLayout = false;
         WindowInsets insets = currentInsets();
-        if (insets == null) return;
+        if (insets == null) return false;
+        surface.updateInsets(insets);
         Insets navigation = read(insets);
         decor.getLocationInWindow(decorPosition);
         inputView.getLocationInWindow(inputPosition);
@@ -117,7 +138,7 @@ public final class KeyboardNavigationInsets
                                 + decor.getHeight()
                                 - inputPosition[1]
                                 - inputView.getHeight());
-        applyPadding(
+        return applyPadding(
                 Insets.of(
                         Math.max(0, navigation.left - leftGap),
                         0,
@@ -125,7 +146,7 @@ public final class KeyboardNavigationInsets
                         Math.max(0, navigation.bottom - bottomGap)));
     }
 
-    private void applyPadding(Insets navigation) {
+    private boolean applyPadding(Insets navigation) {
         if (inputView.getPaddingLeft() != navigation.left
                 || inputView.getPaddingRight() != navigation.right
                 || inputView.getPaddingBottom() != navigation.bottom) {
@@ -134,20 +155,28 @@ public final class KeyboardNavigationInsets
                     inputView.getPaddingTop(),
                     navigation.right,
                     navigation.bottom);
+            paddingNeedsLayout = true;
+            return true;
         }
+        return false;
     }
 
     private void observeLayout() {
+        // Android transfers a detached view's floating observer into the live tree before
+        // attach callbacks. Register only once attached so that transfer cannot duplicate us.
+        if (!decor.isAttachedToWindow()) return;
         ViewTreeObserver tree = decor.getViewTreeObserver();
         if (tree == observedTree) return;
         stopObservingLayout();
         observedTree = tree;
         observedTree.addOnGlobalLayoutListener(this);
+        observedTree.addOnPreDrawListener(this);
     }
 
     private void stopObservingLayout() {
         if (observedTree != null && observedTree.isAlive()) {
             observedTree.removeOnGlobalLayoutListener(this);
+            observedTree.removeOnPreDrawListener(this);
         }
         observedTree = null;
     }

@@ -19,6 +19,9 @@ is not added a second time.
 Navigation spacing is restored from the available window insets when the input
 view is attached, replaced, or reopened. After layout, the keyboard checks how
 much space its ancestors actually reserve and adds only the missing amount.
+A check before each draw also repairs spacing if the navigation state changes
+after layout without another inset callback. When that check changes padding,
+the affected frame waits for layout so the keys are drawn above the controls.
 A visible navigation/caption bar with temporarily empty insets uses its stable
 size on Android 11 and later; genuinely hidden bars do not keep that space.
 
@@ -87,6 +90,9 @@ Recovery tests cover reopening without another inset callback, replacing the
 input view, visible bars with temporarily empty insets, and ancestor spacing
 changing without another inset dispatch. They check both missing and duplicate
 padding and ensure layout listeners are removed when the controller closes.
+Draw-only recovery tests also cover newly visible/hidden bars, moving navigation
+to either side, parent-provided spacing, background painting, and resuming
+drawing without accumulating padding or repeatedly postponing frames.
 
 Device checks still needed for app-specific behavior:
 
@@ -112,6 +118,8 @@ Device checks still needed for app-specific behavior:
    type and long presses perform their configured action only once. In portrait
    mode with three-button navigation, also switch between Chrome and another
    app and verify that the bottom key row remains above the system controls.
+   Repeat after unlocking and after rotating or folding/unfolding the device.
+   Check several keyboard opens without visiting Recents to recover its spacing.
 
 The original revision has 40 Android lint errors (missing Korean translations
 and an indentation issue in the composition engine). These are separate from

@@ -32,6 +32,9 @@ final class KeyboardWindowBackground extends Drawable {
     @RequiresApi(21)
     void updateInsets(WindowInsets insets) {
         Insets navigation = KeyboardNavigationInsets.read(insets);
+        if (left == navigation.left && right == navigation.right && bottom == navigation.bottom) {
+            return;
+        }
         left = navigation.left;
         right = navigation.right;
         bottom = navigation.bottom;
