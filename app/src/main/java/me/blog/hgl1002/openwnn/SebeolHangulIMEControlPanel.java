@@ -1,8 +1,11 @@
 package me.blog.hgl1002.openwnn;
 
 import android.content.Context;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -16,6 +19,8 @@ import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
+
+import me.blog.hgl1002.openwnn.view.KeyboardLayoutDiagnostics;
 
 public class SebeolHangulIMEControlPanel extends AppCompatActivity implements PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
 
@@ -134,6 +139,18 @@ public class SebeolHangulIMEControlPanel extends AppCompatActivity implements Pr
 		@Override
 		public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
 			setPreferencesFromResource(R.xml.openwnn_pref_ko_about, rootKey);
+			Preference copyLayout = findPreference("copy_keyboard_layout_report");
+			if (copyLayout != null) {
+				copyLayout.setOnPreferenceClickListener(preference -> {
+					ClipboardManager clipboard = (ClipboardManager)
+							requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+					clipboard.setPrimaryClip(ClipData.newPlainText(
+							"OpenWnn keyboard layout report", KeyboardLayoutDiagnostics.report()));
+					Toast.makeText(requireContext(), R.string.keyboard_layout_report_copied,
+							Toast.LENGTH_SHORT).show();
+					return true;
+				});
+			}
 		}
 	}
 

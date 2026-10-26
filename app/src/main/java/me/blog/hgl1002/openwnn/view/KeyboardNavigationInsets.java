@@ -17,17 +17,20 @@ public final class KeyboardNavigationInsets
                 ViewTreeObserver.OnGlobalLayoutListener,
                 ViewTreeObserver.OnPreDrawListener {
     private final View decor;
+    private final Window window;
     private final KeyboardWindowBackground surface;
     private final Runnable refreshAfterAttach = this::refresh;
     private final int[] decorPosition = new int[2];
     private final int[] inputPosition = new int[2];
     private View inputView;
     private WindowInsets lastInsets;
+    private WindowInsets lastRemainingInsets;
     private ViewTreeObserver observedTree;
     private boolean paddingNeedsLayout;
     private boolean closed;
 
     public KeyboardNavigationInsets(Window window, int background) {
+        this.window = window;
         decor = window.getDecorView();
         surface = new KeyboardWindowBackground(background);
         decor.setBackground(surface);
@@ -77,6 +80,8 @@ public final class KeyboardNavigationInsets
         lastInsets = insets;
         surface.updateInsets(insets);
         WindowInsets remaining = view.onApplyWindowInsets(insets);
+        lastRemainingInsets = remaining;
+        recordLayout("insets-before-padding");
         if (inputView == null) return remaining;
         Insets navigation = read(remaining);
         applyPadding(navigation);
@@ -90,6 +95,7 @@ public final class KeyboardNavigationInsets
     @Override
     public void onGlobalLayout() {
         reconcilePadding();
+        recordLayout("layout");
     }
 
     @Override
@@ -97,6 +103,7 @@ public final class KeyboardNavigationInsets
         // Global layout need not run on a draw-only traversal. If newer window state needs
         // more space, let the requested layout finish before displaying the affected keys.
         reconcilePadding();
+        recordLayout("draw");
         return inputView == null
                 || !inputView.isAttachedToWindow()
                 || !inputView.isShown()
@@ -186,15 +193,18 @@ public final class KeyboardNavigationInsets
         observeLayout();
         scheduleRefresh();
         decor.requestApplyInsets();
+        recordLayout("attach");
     }
 
     @Override
     public void onViewDetachedFromWindow(View view) {
+        recordLayout("detach");
         decor.removeCallbacks(refreshAfterAttach);
         if (view == decor) stopObservingLayout();
     }
 
     public void close() {
+        recordLayout("close");
         closed = true;
         decor.removeCallbacks(refreshAfterAttach);
         decor.setOnApplyWindowInsetsListener(null);
@@ -203,6 +213,12 @@ public final class KeyboardNavigationInsets
         stopObservingLayout();
         inputView = null;
         lastInsets = null;
+        lastRemainingInsets = null;
+    }
+
+    private void recordLayout(String event) {
+        KeyboardLayoutDiagnostics.record(event, window, inputView, lastInsets,
+                lastRemainingInsets, paddingNeedsLayout);
     }
 
     static Insets read(WindowInsets insets) {

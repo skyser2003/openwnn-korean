@@ -15,6 +15,9 @@
 -->
 <resources>
     <string name="preference_keyboard_system">Follow system</string>
+    <string name="copy_keyboard_layout_report">Copy keyboard layout report</string>
+    <string name="keyboard_layout_report_summary">Copy recent window and navigation-bar geometry to diagnose overlap. Typed text is excluded.</string>
+    <string name="keyboard_layout_report_copied">Keyboard layout report copied</string>
   <!-- common part -->
 
   <string name="app_name">Sebeolsik Hangul IME</string>

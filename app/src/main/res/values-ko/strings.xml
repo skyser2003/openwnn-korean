@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="preference_keyboard_system">시스템 설정 따르기</string>
+    <string name="copy_keyboard_layout_report">키보드 배치 보고서 복사</string>
+    <string name="keyboard_layout_report_summary">겹침 문제 진단을 위해 최근 창과 내비게이션 바의 위치 및 크기를 복사합니다. 입력한 글자는 포함하지 않습니다.</string>
+    <string name="keyboard_layout_report_copied">키보드 배치 보고서를 복사했습니다</string>
     <!-- common part -->
 
     <string name="app_name">세벌식 한글 입력기</string>

@@ -58,6 +58,21 @@ automatically; legacy text fields using `TYPE_NULL` also follow the non-text
 layout. An input method can only remap keys Android delivers to it; keys
 intercepted by the system or before IME dispatch are outside this setting's control.
 
+## Capturing navigation overlap
+
+If Android's navigation controls overlap the bottom key row, reproduce it and
+then open the OpenWnn settings app → **About IME → Copy keyboard layout report**
+(**IME 정보 → 키보드 배치 보고서 복사** in Korean). Paste the copied report when
+reporting the problem. Opening settings may restore the spacing, but the report
+retains up to 32 recent changed window states in the same app process, including
+the state before settings opened. Capture it soon after the overlap occurs.
+
+The report includes the APK/device/Android version, bar insets and visibility,
+window metrics and flags, and keyboard/ancestor geometry. It excludes editor
+text, key events, and view labels. Data stays in memory until the app process
+ends; the copy action writes to the clipboard only when tapped. Recording is
+diagnostic and does not change navigation spacing.
+
 ## Building and testing
 
 Use JDK 17, Android SDK platform 36, and build-tools 35.0.0. Set `JAVA_HOME` and

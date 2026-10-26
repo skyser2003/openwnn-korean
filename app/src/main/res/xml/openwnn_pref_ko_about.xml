@@ -11,6 +11,9 @@
 			style="?android:preferenceInformationStyle"
 			android:title="@string/openwnn_korean_donate_title"
 			android:summary="@string/openwnn_korean_donate_summary" />
+		<Preference android:key="copy_keyboard_layout_report"
+			android:title="@string/copy_keyboard_layout_report"
+			android:summary="@string/keyboard_layout_report_summary" />
 	</PreferenceCategory>
 
 </PreferenceScreen>
