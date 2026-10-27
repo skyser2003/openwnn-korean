@@ -30,7 +30,9 @@ Under **Hardware keyboard**:
 - **Hide software keyboard completely** hides the keyboard window, number pad,
   and indicator strip while a physical keyboard is available. Composition and
   hardware language switching remain active. Disconnecting the keyboard restores
-  the software keyboard for the current text editor.
+  the software keyboard for the current text editor. Leaving the option unchecked
+  shows the full on-screen keyboard even with a physical keyboard connected. The
+  optional hardware indicator strip and number pad supplement the normal keys.
 - **Non-text input layout** defaults to **Follow hardware alphabet layout**.
   Colemak and Dvorak use their alphabet mappings for app controls, including
   single-key and Shift-key commands outside text fields and Ctrl, Alt, and Meta

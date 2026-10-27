@@ -893,7 +893,10 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 				mMainView.addView(mNumKeyboardView);
 			if (mShowNumKeyboardViewLandscape && mDisplayMode == LANDSCAPE)
 				mMainView.addView(mNumKeyboardView);
-		} else if (mKeyboardView != null) {
+		}
+		// Hardware extras supplement the full keyboard. Window visibility is controlled by
+		// the hide-software-keyboard preference in the IME service.
+		if (mKeyboardView != null) {
 			mMainView.addView(mKeyboardView);
 		}
 		mKeyboardView.setOnTouchListener(new OnKeyboardViewTouchListener());

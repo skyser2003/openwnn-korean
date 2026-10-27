@@ -6,11 +6,15 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.inputmethodservice.InputMethodService;
+import android.inputmethodservice.Keyboard;
+import android.inputmethodservice.KeyboardView;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.InputType;
 import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
@@ -147,6 +151,52 @@ public class InputSessionTest {
         preferences.edit().putBoolean("hardware_hide_keyboard", false).apply();
         Shadows.shadowOf(Looper.getMainLooper()).idle();
         assertTrue(ime.onEvaluateInputViewShown());
+        assertTrue(ime.hasHardwareKeyboard());
+        KeyboardView keyboard = fullSoftwareKeyboard();
+        assertTrue(keyboard.getKeyboard().getKeys().size() > 20);
+        ime.onStartInputView(ime.getCurrentInputEditorInfo(), false);
+        tap(keyboard, 'a');
+        press(KeyEvent.KEYCODE_G, 0);
+        assertEquals("ad", connection.getEditable().toString());
+        preferences.edit().putBoolean("hardware_hide_keyboard", true).apply();
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertFalse(ime.onEvaluateInputViewShown());
+        assertFalse(ime.onShowInputRequested(InputMethod.SHOW_EXPLICIT, false));
+    }
+
+    @Test
+    @Config(sdk = {28, 33, 35})
+    public void uncheckedOptionShowsKeysOnStartupEvenWithBothHardwareExtrasDisabled() {
+        controller.destroy();
+        controller = null;
+        preferences.edit()
+                .putBoolean("hardware_hide_keyboard", false)
+                .putBoolean("hardware_use_subview", false)
+                .putBoolean("hardware_use_numkeyboard", false)
+                .apply();
+        controller = Robolectric.buildService(SebeolHangulIME.class).create();
+        ime = controller.get();
+        inputMethod = (InputMethodService.InputMethodImpl) ime.onCreateInputMethodInterface();
+        connection = new RecordingConnection(new View(ime));
+        startEditor(connection);
+        assertTrue(ime.hasHardwareKeyboard());
+        assertTrue(ime.onEvaluateInputViewShown());
+        assertTrue(fullSoftwareKeyboard().getKeyboard().getKeys().size() > 20);
+    }
+
+    @Test
+    @Config(sdk = {28, 33, 35})
+    public void uncheckedOptionKeepsKeysAcrossHardwareConnectionChanges() {
+        preferences.edit().putBoolean("hardware_hide_keyboard", false).apply();
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        for (boolean connected : new boolean[] {false, true, false, true}) {
+            ime.onConfigurationChanged(configureHardware(connected));
+            // Resume the editor under the new configuration, as during an IME restart.
+            startEditor(connection);
+            assertEquals(connected, ime.hasHardwareKeyboard());
+            assertTrue(ime.onEvaluateInputViewShown());
+            assertTrue(fullSoftwareKeyboard().getKeyboard().getKeys().size() > 20);
+        }
     }
 
     @Test
@@ -328,6 +378,26 @@ public class InputSessionTest {
     private void press(int keyCode, int modifiers) {
         ime.onKeyDown(keyCode, key(KeyEvent.ACTION_DOWN, keyCode, modifiers));
         ime.onKeyUp(keyCode, key(KeyEvent.ACTION_UP, keyCode, modifiers));
+    }
+
+    private KeyboardView fullSoftwareKeyboard() {
+        KeyboardView keyboard = ime.onCreateInputView().findViewById(R.id.keyboard);
+        assertNotNull("The full key view must be present, not only the language indicator", keyboard);
+        assertEquals(View.VISIBLE, keyboard.getVisibility());
+        return keyboard;
+    }
+
+    private static void tap(KeyboardView keyboard, int code) {
+        Keyboard.Key target = keyboard.getKeyboard().getKeys().stream()
+                .filter(key -> key.codes[0] == code).findFirst()
+                .orElseThrow(() -> new AssertionError("Missing touch key: " + code));
+        long downTime = SystemClock.uptimeMillis();
+        for (int action : new int[] {MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP}) {
+            MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                    target.x + target.width / 2f, target.y + target.height / 2f, 0);
+            keyboard.dispatchTouchEvent(event);
+            event.recycle();
+        }
     }
 
     private static KeyEvent key(int action, int code, int modifiers) {

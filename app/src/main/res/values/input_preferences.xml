@@ -3,7 +3,7 @@
     <string name="preference_app_language_title">App language</string>
     <string name="preference_app_language_system">System default</string>
     <string name="preference_hardware_hide_keyboard_title">Hide software keyboard completely</string>
-    <string name="preference_hardware_hide_keyboard_summary">Hide the keyboard, number pad, and indicator strip while a physical keyboard is connected. Hardware typing stays active.</string>
+    <string name="preference_hardware_hide_keyboard_summary">Hide the keyboard, number pad, and indicator strip while a physical keyboard is connected. Leave unchecked to show the full on-screen keyboard. Hardware typing stays active.</string>
     <string name="preference_hardware_shortcut_layout_title">Non-text input layout</string>
     <string name="preference_hardware_shortcut_layout_summary">Choose the layout for app controls, including single-key commands outside text fields and Ctrl, Alt, or Meta shortcuts. Applies in English and Korean modes. Text entry keeps its selected typing layout.</string>
     <string name="preference_hardware_shortcut_layout_follow">Follow hardware alphabet layout</string>
