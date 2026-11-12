@@ -30,6 +30,13 @@ metrics. Only the bar area overlapping the actual keyboard window is reserved,
 so windows already fitted above navigation do not get a second gap. This fallback
 is refreshed on layout, inset delivery, and reopening rather than retaining the
 previous display's bar size.
+The keyboard also measures Android's visible IME navigation frame so its buttons
+cannot overlap keys when both inset sources are missing. On Samsung devices with
+button navigation enabled, it additionally reserves the system-configured button
+bar size even if One UI reports that bar hidden or too small after folding. This
+uses the current display's Android resources, not a fixed pixel height. Samsung's
+gesture-navigation setting disables that button-bar fallback; space already
+provided outside the keyboard window or by ancestors is counted once.
 
 Under **Hardware keyboard**:
 
@@ -121,6 +128,10 @@ reset with empty root insets: folding while visible, opening after folding,
 repeated fold/unfold cycles, and a tap at the bottom edge of the space key. They
 also cover metrics recovery, gesture/side/hidden navigation, and space already
 reserved by either the window manager or an ancestor.
+Samsung regressions also cover both inset sources reporting empty/hidden, a
+visible framework navigation frame with no reported inset, undersized insets,
+switching between button and gesture navigation, and a bottom-edge space-key tap
+with every reported bar inset zero.
 
 Device checks still needed for app-specific behavior:
 

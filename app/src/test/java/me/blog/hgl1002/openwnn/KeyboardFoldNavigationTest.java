@@ -3,6 +3,7 @@ package me.blog.hgl1002.openwnn;
 import static org.junit.Assert.*;
 
 import android.content.res.Configuration;
+import android.content.Context;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.inputmethodservice.InputMethodService;
@@ -13,10 +14,12 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.text.InputType;
 import android.util.DisplayMetrics;
 import android.view.View;
 import android.view.MotionEvent;
+import android.view.Gravity;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -24,6 +27,7 @@ import android.view.WindowMetrics;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputBinding;
+import android.widget.FrameLayout;
 
 import androidx.preference.PreferenceManager;
 
@@ -56,9 +60,11 @@ public class KeyboardFoldNavigationTest {
     private BaseInputConnection connection;
     private int width = 800;
     private int height = 1200;
+    private String originalManufacturer;
 
     @Before
     public void setUp() {
+        originalManufacturer = Build.MANUFACTURER;
         MetricsWindowManager.metrics = metrics(800, 1200, 48);
         PreferenceManager.getDefaultSharedPreferences(RuntimeEnvironment.getApplication())
                 .edit().clear().putBoolean("initial_launch", false)
@@ -96,6 +102,7 @@ public class KeyboardFoldNavigationTest {
     @After
     public void tearDown() {
         controller.destroy();
+        ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", originalManufacturer);
         MetricsWindowManager.metrics = null;
     }
 
@@ -172,13 +179,17 @@ public class KeyboardFoldNavigationTest {
         foldTo(1200, 1600, 64);
         ime.showWindow(true);
         layout();
+        tapBottomEdgeOfSpace(64);
+    }
+
+    private void tapBottomEdgeOfSpace(int barHeight) {
         KeyboardView keyboard = input.findViewById(R.id.keyboard);
         Keyboard.Key space = keyboard.getKeyboard().getKeys().stream()
                 .filter(key -> key.codes[0] == -10).findFirst().get();
         int[] position = new int[2];
         keyboard.getLocationOnScreen(position);
         assertTrue("The bottom of the space key must be outside system navigation",
-                position[1] + space.y + space.height <= height - 64);
+                position[1] + space.y + space.height <= height - barHeight);
         keyboard.getLocationInWindow(position);
         long time = SystemClock.uptimeMillis();
         for (int action : new int[] {MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP}) {
@@ -237,6 +248,95 @@ public class KeyboardFoldNavigationTest {
         MetricsWindowManager.metrics = metrics(width, height, 64);
         layout();
         assertKeysAboveBottomBar(64);
+    }
+
+    @Test
+    public void renderedImeNavigationProtectsKeysWhenBothInsetSourcesAreEmpty() throws Exception {
+        foldTo(1200, 1600, 0);
+        Class<?> frameClass = Class.forName(
+                "android.inputmethodservice.navigationbar.NavigationBarFrame");
+        View frame = (View) ReflectionHelpers.callConstructor(frameClass,
+                ReflectionHelpers.ClassParameter.from(Context.class, ime));
+        ((ViewGroup) decor).addView(frame, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 64, Gravity.BOTTOM));
+        layout();
+        assertKeysAboveBottomBar(64);
+        frame.setVisibility(View.GONE);
+        layout();
+        assertKeysAboveBottomBar(0);
+    }
+
+    @Test
+    public void samsungButtonsProtectKeysEvenWhenAllBarGeometryAndVisibilityAreEmpty() {
+        samsungNavigation(0);
+        ime.hideWindow();
+        foldTo(1200, 1600, 0);
+        ime.showWindow(true);
+        layout();
+        assertKeysAboveBottomBar(configuredNavigationHeight());
+        tapBottomEdgeOfSpace(configuredNavigationHeight());
+        foldTo(800, 1200, 0);
+        layout();
+        assertKeysAboveBottomBar(configuredNavigationHeight());
+    }
+
+    @Test
+    public void samsungButtonsUseStableSizeDespiteIncorrectHiddenVisibility() {
+        samsungNavigation(0);
+        foldTo(1200, 1600, 0);
+        WindowInsets wrongVisibility = new WindowInsets.Builder(navigation(0))
+                .setInsetsIgnoringVisibility(WindowInsets.Type.navigationBars(),
+                        Insets.of(0, 0, 0, 96)).build();
+        dispatchRootInsets(wrongVisibility);
+        layout();
+        assertKeysAboveBottomBar(96);
+    }
+
+    @Test
+    public void samsungGesturesDoNotUseButtonBarHeight() {
+        samsungNavigation(1);
+        foldTo(1200, 1600, 0);
+        layout();
+        assertKeysAboveBottomBar(0);
+        samsungNavigation(0);
+        layout();
+        assertKeysAboveBottomBar(configuredNavigationHeight());
+        samsungNavigation(1);
+        layout();
+        assertKeysAboveBottomBar(0);
+    }
+
+    @Test
+    public void samsungButtonsAlsoProtectAgainstUndersizedNonzeroInsets() {
+        samsungNavigation(0);
+        foldTo(1200, 1600, 24);
+        dispatchRootInsets(navigation(24));
+        layout();
+        assertKeysAboveBottomBar(configuredNavigationHeight());
+    }
+
+    @Test
+    public void samsungResourceFallbackDoesNotDuplicateWindowManagerSpace() {
+        samsungNavigation(0);
+        int bar = configuredNavigationHeight();
+        height = 1200 - bar;
+        dispatchRootInsets(navigation(0));
+        layout();
+        assertKeysAboveBottomBar(0);
+    }
+
+    private void samsungNavigation(int gestureMode) {
+        ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
+        Settings.Global.putInt(ime.getContentResolver(), "navigation_bar_gesture_while_hidden",
+                gestureMode);
+        Settings.Secure.putInt(ime.getContentResolver(), "navigation_mode", 0);
+    }
+
+    private int configuredNavigationHeight() {
+        int id = ime.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        int size = ime.getResources().getDimensionPixelSize(id);
+        assertTrue("The platform must supply a button-bar height", size > 0);
+        return size;
     }
 
     private void foldTo(int newWidth, int newHeight, int navigationHeight) {

@@ -3,6 +3,7 @@ package me.blog.hgl1002.openwnn.view;
 import android.graphics.Rect;
 import android.os.Build;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -29,6 +30,7 @@ public final class KeyboardNavigationInsets
     private Insets metricsNavigation = Insets.NONE;
     private WindowInsets metricsRootInsets;
     private boolean metricsNeedRefresh = true;
+    private final KeyboardSystemNavigation systemNavigation;
     private View inputView;
     private WindowInsets lastInsets;
     private WindowInsets lastRemainingInsets;
@@ -39,6 +41,7 @@ public final class KeyboardNavigationInsets
     public KeyboardNavigationInsets(Window window, int background) {
         this.window = window;
         decor = window.getDecorView();
+        systemNavigation = new KeyboardSystemNavigation(decor);
         surface = new KeyboardWindowBackground(background);
         decor.setBackground(surface);
         decor.setOnApplyWindowInsetsListener(this);
@@ -63,6 +66,7 @@ public final class KeyboardNavigationInsets
     private void refresh() {
         if (closed) return;
         metricsNeedRefresh = true;
+        systemNavigation.invalidate();
         WindowInsets insets = currentInsets();
         if (insets != null) decor.dispatchApplyWindowInsets(insets);
         decor.requestApplyInsets();
@@ -86,6 +90,7 @@ public final class KeyboardNavigationInsets
     @Override
     public WindowInsets onApplyWindowInsets(View view, WindowInsets insets) {
         metricsNeedRefresh = true;
+        systemNavigation.invalidate();
         lastInsets = insets;
         surface.updateInsets(insets);
         WindowInsets remaining = view.onApplyWindowInsets(insets);
@@ -104,6 +109,7 @@ public final class KeyboardNavigationInsets
     @Override
     public void onGlobalLayout() {
         metricsNeedRefresh = true;
+        systemNavigation.invalidate();
         reconcilePadding();
         recordLayout("layout");
     }
@@ -134,12 +140,20 @@ public final class KeyboardNavigationInsets
         paddingNeedsLayout = false;
         WindowInsets insets = currentInsets();
         Insets navigation = insets == null ? Insets.NONE : read(insets);
-        if (Build.VERSION.SDK_INT >= 30 && navigation.equals(Insets.NONE)) {
-            navigation = readWindowNavigation(insets);
+        boolean samsungButtons = systemNavigation.hasSamsungButtons();
+        if (Build.VERSION.SDK_INT >= 30
+                && (navigation.equals(Insets.NONE) || samsungButtons)) {
+            navigation = Insets.max(navigation, readWindowNavigation(insets));
         }
-        surface.updateInsets(navigation);
         decor.getLocationInWindow(decorPosition);
         inputView.getLocationInWindow(inputPosition);
+        navigation = Insets.max(navigation,
+                systemNavigation.readRendered((ViewGroup) decor, inputView));
+        if (Build.VERSION.SDK_INT >= 30 && samsungButtons) {
+            navigation = Insets.max(navigation,
+                    systemNavigation.readSamsungButtons(insets, navigation, metricsBounds));
+        }
+        surface.updateInsets(navigation);
         // Verify the space actually reserved by ancestors, rather than assuming that a
         // consumed inset still corresponds to a margin after a window transition.
         int leftGap = Math.max(0, inputPosition[0] - decorPosition[0]);
