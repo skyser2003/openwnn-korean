@@ -24,6 +24,12 @@ after layout without another inset callback. When that check changes padding,
 the affected frame waits for layout so the keys are drawn above the controls.
 A visible navigation/caption bar with temporarily empty insets uses its stable
 size on Android 11 and later; genuinely hidden bars do not keep that space.
+If the keyboard window temporarily loses all bar insets during a fold/display
+transition, Android 11 and later also check the current window-manager navigation
+metrics. Only the bar area overlapping the actual keyboard window is reserved,
+so windows already fitted above navigation do not get a second gap. This fallback
+is refreshed on layout, inset delivery, and reopening rather than retaining the
+previous display's bar size.
 
 Under **Hardware keyboard**:
 
@@ -110,6 +116,11 @@ padding and ensure layout listeners are removed when the controller closes.
 Draw-only recovery tests also cover newly visible/hidden bars, moving navigation
 to either side, parent-provided spacing, background painting, and resuming
 drawing without accumulating padding or repeatedly postponing frames.
+Fold regressions on API 33/35 exercise the input-method service's configuration
+reset with empty root insets: folding while visible, opening after folding,
+repeated fold/unfold cycles, and a tap at the bottom edge of the space key. They
+also cover metrics recovery, gesture/side/hidden navigation, and space already
+reserved by either the window manager or an ancestor.
 
 Device checks still needed for app-specific behavior:
 

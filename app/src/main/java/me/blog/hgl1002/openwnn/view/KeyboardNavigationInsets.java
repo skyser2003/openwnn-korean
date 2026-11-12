@@ -1,10 +1,12 @@
 package me.blog.hgl1002.openwnn.view;
 
+import android.graphics.Rect;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.view.WindowMetrics;
 
 import androidx.annotation.RequiresApi;
 import androidx.core.graphics.Insets;
@@ -22,6 +24,11 @@ public final class KeyboardNavigationInsets
     private final Runnable refreshAfterAttach = this::refresh;
     private final int[] decorPosition = new int[2];
     private final int[] inputPosition = new int[2];
+    private final int[] screenPosition = new int[2];
+    private final Rect metricsBounds = new Rect();
+    private Insets metricsNavigation = Insets.NONE;
+    private WindowInsets metricsRootInsets;
+    private boolean metricsNeedRefresh = true;
     private View inputView;
     private WindowInsets lastInsets;
     private WindowInsets lastRemainingInsets;
@@ -55,6 +62,7 @@ public final class KeyboardNavigationInsets
 
     private void refresh() {
         if (closed) return;
+        metricsNeedRefresh = true;
         WindowInsets insets = currentInsets();
         if (insets != null) decor.dispatchApplyWindowInsets(insets);
         decor.requestApplyInsets();
@@ -77,6 +85,7 @@ public final class KeyboardNavigationInsets
 
     @Override
     public WindowInsets onApplyWindowInsets(View view, WindowInsets insets) {
+        metricsNeedRefresh = true;
         lastInsets = insets;
         surface.updateInsets(insets);
         WindowInsets remaining = view.onApplyWindowInsets(insets);
@@ -94,6 +103,7 @@ public final class KeyboardNavigationInsets
 
     @Override
     public void onGlobalLayout() {
+        metricsNeedRefresh = true;
         reconcilePadding();
         recordLayout("layout");
     }
@@ -123,9 +133,11 @@ public final class KeyboardNavigationInsets
                 || inputView.getHeight() == 0) return false;
         paddingNeedsLayout = false;
         WindowInsets insets = currentInsets();
-        if (insets == null) return false;
-        surface.updateInsets(insets);
-        Insets navigation = read(insets);
+        Insets navigation = insets == null ? Insets.NONE : read(insets);
+        if (Build.VERSION.SDK_INT >= 30 && navigation.equals(Insets.NONE)) {
+            navigation = readWindowNavigation(insets);
+        }
+        surface.updateInsets(navigation);
         decor.getLocationInWindow(decorPosition);
         inputView.getLocationInWindow(inputPosition);
         // Verify the space actually reserved by ancestors, rather than assuming that a
@@ -151,6 +163,47 @@ public final class KeyboardNavigationInsets
                         0,
                         Math.max(0, navigation.right - rightGap),
                         Math.max(0, navigation.bottom - bottomGap)));
+    }
+
+    @RequiresApi(30)
+    private Insets readWindowNavigation(WindowInsets rootInsets) {
+        // A display transition can leave the IME ViewRoot with empty bar sources even
+        // after reopening. Window metrics query the current window-manager state instead.
+        // Cache between layouts/draws; never carry a snapshot across an inset or show event.
+        if (metricsNeedRefresh || metricsRootInsets != rootInsets) {
+            metricsNeedRefresh = false;
+            metricsRootInsets = rootInsets;
+            metricsBounds.setEmpty();
+            metricsNavigation = Insets.NONE;
+            try {
+                WindowMetrics metrics = window.getWindowManager().getCurrentWindowMetrics();
+                metricsBounds.set(metrics.getBounds());
+                // Caption bars belong to this IME's ViewRoot, not the metrics' outer window.
+                metricsNavigation = readVisibleType(
+                        metrics.getWindowInsets(), WindowInsets.Type.navigationBars());
+            } catch (RuntimeException unavailable) {
+                // Some window contexts cannot supply metrics while switching displays.
+                // Keep using delivered insets and retry after the next layout/show event.
+            }
+        }
+        if (metricsNavigation.equals(Insets.NONE)) return Insets.NONE;
+        decor.getLocationOnScreen(screenPosition);
+        int left = screenPosition[0];
+        int top = screenPosition[1];
+        int right = left + decor.getWidth();
+        int bottom = top + decor.getHeight();
+        if (right <= metricsBounds.left || left >= metricsBounds.right
+                || bottom <= metricsBounds.top || top >= metricsBounds.bottom) return Insets.NONE;
+        // Metrics describe the outer window. Only reserve the portion overlapping the
+        // actual IME window; a window already fitted above navigation needs no extra gap.
+        return Insets.of(
+                metricsNavigation.left == 0 ? 0 : Math.min(decor.getWidth(),
+                        Math.max(0, metricsBounds.left + metricsNavigation.left - left)),
+                0,
+                metricsNavigation.right == 0 ? 0 : Math.min(decor.getWidth(),
+                        Math.max(0, right - metricsBounds.right + metricsNavigation.right)),
+                metricsNavigation.bottom == 0 ? 0 : Math.min(decor.getHeight(),
+                        Math.max(0, bottom - metricsBounds.bottom + metricsNavigation.bottom)));
     }
 
     private boolean applyPadding(Insets navigation) {
