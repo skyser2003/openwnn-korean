@@ -24,11 +24,11 @@ A visible navigation/caption bar with temporarily empty insets uses its stable
 size on Android 11 and later; genuinely hidden bars do not keep that space.
 If the keyboard window temporarily loses all bar insets during a fold/display
 transition, Android 11 and later also check the current window-manager navigation
-metrics and the visible IME navigation frame. On Samsung devices, the keyboard
-keeps at least 64 dp of space below the keys inside its window, including with
-gesture navigation or when One UI reports zero bar space after folding. A larger
-reported bar takes precedence. Space already present inside the window counts
-toward this minimum.
+metrics and the visible IME navigation frame. Android's tappable element insets
+also identify button areas that block touches even when the navigation bar inset
+is empty. Android 15 and later can supply the bounds of a visible bar that
+covers only part of the bottom edge. The keyboard clears reported controls and
+fills the available area when they are gone.
 
 Under **Hardware keyboard**:
 
@@ -120,9 +120,8 @@ reset with empty root insets: folding while visible, opening after folding,
 repeated fold/unfold cycles, and a tap at the bottom edge of the space key. They
 also cover metrics recovery, gesture/side/hidden navigation, and space already
 reserved by either the window manager or an ancestor.
-Samsung regressions cover the minimum clearance before layout and after folding,
-including when One UI reports gesture mode and no bar geometry. They check
-bottom-edge space-key taps, larger bars, and spacing supplied by a parent view.
+Additional regressions cover visible system buttons with an empty navigation
+inset, a partial-width bar, and removal of the gap when the controls disappear.
 
 Device checks still needed for app-specific behavior:
 

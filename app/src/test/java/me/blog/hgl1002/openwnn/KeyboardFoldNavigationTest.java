@@ -14,7 +14,6 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.provider.Settings;
 import android.text.InputType;
 import android.util.DisplayMetrics;
 import android.view.View;
@@ -47,6 +46,8 @@ import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowDisplay;
 import org.robolectric.shadows.ShadowWindowManagerImpl;
 import org.robolectric.util.ReflectionHelpers;
+
+import java.util.Collections;
 
 /** The IME's root insets can lag the window manager during a fold/display transition. */
 @RunWith(RobolectricTestRunner.class)
@@ -267,62 +268,77 @@ public class KeyboardFoldNavigationTest {
     }
 
     @Test
-    public void samsungKeysClearBottomEvenWhenNavigationModeAndGeometryAreUnreliable() {
-        samsungReportingGestures();
-        int clearance = samsungClearance();
+    public void samsungBottomKeysClearVisibleButtonsAfterFolding() {
+        ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
         ime.hideWindow();
         foldTo(1200, 1600, 0);
         MetricsWindowManager.metrics = null;
+        dispatchRootInsets(systemButtons(52));
         ime.showWindow(true);
         layout();
-        assertKeysAboveBottomBar(clearance);
-        tapBottomEdgeOfSpace(clearance);
+        assertKeysAboveBottomBar(52);
+        tapBottomEdgeOfSpace(52);
         foldTo(800, 1200, 0);
         layout();
-        assertKeysAboveBottomBar(clearance);
+        assertKeysAboveBottomBar(0);
     }
 
     @Test
-    public void samsungReservesClearanceOnInsetDispatchBeforeLayout() {
-        samsungReportingGestures();
+    public void metricsCanReportVisibleButtonsWhenTheImeInsetsDoNot() {
         foldTo(1200, 1600, 0);
-        dispatchRootInsets(navigation(0));
-        assertEquals(samsungClearance(), input.getPaddingBottom());
+        MetricsWindowManager.metrics = new WindowMetrics(new Rect(0, 0, width, height),
+                systemButtons(52));
+        layout();
+        assertKeysAboveBottomBar(52);
+        MetricsWindowManager.metrics = metrics(width, height, 0);
+        layout();
+        assertKeysAboveBottomBar(0);
     }
 
     @Test
-    public void samsungUsesTheLargerOfTheBarAndTheMinimumClearance() {
-        samsungReportingGestures();
-        int clearance = samsungClearance();
-        int largerBar = clearance + 32;
-        foldTo(1200, 1600, largerBar);
-        dispatchRootInsets(navigation(largerBar));
-        layout();
-        assertKeysAboveBottomBar(largerBar);
-        MetricsWindowManager.metrics = metrics(width, height, 24);
-        dispatchRootInsets(navigation(24));
-        layout();
-        assertKeysAboveBottomBar(clearance);
-    }
-
-    @Test
-    public void samsungClearanceCountsSpaceAlreadyReservedInsideTheKeyboardWindow() {
-        samsungReportingGestures();
-        foldTo(1200, 1600, 0);
-        View parent = (View) input.getParent();
-        parent.setPadding(0, 0, 0, 24);
-        layout();
-        assertKeysAboveBottomBar(samsungClearance());
-    }
-
-    private void samsungReportingGestures() {
+    public void hiddenButtonsAndGestureOnlyAreaLeaveNoSamsungGap() {
         ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
-        Settings.Global.putInt(ime.getContentResolver(), "navigation_bar_gesture_while_hidden", 1);
-        Settings.Secure.putInt(ime.getContentResolver(), "navigation_mode", 2);
+        foldTo(1200, 1600, 0);
+        dispatchRootInsets(systemButtons(52));
+        layout();
+        assertKeysAboveBottomBar(52);
+        WindowInsets hidden = new WindowInsets.Builder(navigation(0))
+                .setInsetsIgnoringVisibility(WindowInsets.Type.navigationBars(),
+                        Insets.of(0, 0, 0, 52))
+                .setInsetsIgnoringVisibility(WindowInsets.Type.tappableElement(),
+                        Insets.of(0, 0, 0, 52))
+                .setInsets(WindowInsets.Type.mandatorySystemGestures(), Insets.of(0, 0, 0, 24))
+                .build();
+        dispatchRootInsets(hidden);
+        layout();
+        assertKeysAboveBottomBar(0);
     }
 
-    private int samsungClearance() {
-        return Math.round(64 * decor.getResources().getDisplayMetrics().density);
+    @Test
+    @Config(sdk = 35)
+    public void partialWidthNavigationBoundsProtectKeysWithoutAnEdgeInset() {
+        foldTo(1200, 1600, 0);
+        layout();
+        int frameHeight = decor.getHeight();
+        WindowInsets partialBar = new WindowInsets.Builder(navigation(0))
+                .setFrame(width, frameHeight)
+                .setBoundingRects(WindowInsets.Type.navigationBars(), Collections.singletonList(
+                        new Rect(width / 4, frameHeight - 52, width / 2, frameHeight)))
+                .setVisible(WindowInsets.Type.navigationBars(), true)
+                .build();
+        dispatchRootInsets(partialBar);
+        layout();
+        assertKeysAboveBottomBar(52);
+        dispatchRootInsets(navigation(0));
+        layout();
+        assertKeysAboveBottomBar(0);
+    }
+
+    private static WindowInsets systemButtons(int bottom) {
+        return new WindowInsets.Builder(navigation(0))
+                .setInsets(WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, bottom))
+                .setVisible(WindowInsets.Type.tappableElement(), true)
+                .build();
     }
 
     private void foldTo(int newWidth, int newHeight, int navigationHeight) {

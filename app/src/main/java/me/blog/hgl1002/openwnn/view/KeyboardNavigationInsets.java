@@ -12,8 +12,6 @@ import android.view.WindowMetrics;
 import androidx.annotation.RequiresApi;
 import androidx.core.graphics.Insets;
 
-import me.blog.hgl1002.openwnn.R;
-
 /** Keeps the input view above navigation across inset dispatch, attachment, and drawing. */
 @RequiresApi(21)
 public final class KeyboardNavigationInsets
@@ -24,7 +22,6 @@ public final class KeyboardNavigationInsets
     private final View decor;
     private final Window window;
     private final KeyboardWindowBackground surface;
-    private final int minimumBottom;
     private final Runnable refreshAfterAttach = this::refresh;
     private final int[] decorPosition = new int[2];
     private final int[] inputPosition = new int[2];
@@ -44,11 +41,6 @@ public final class KeyboardNavigationInsets
     public KeyboardNavigationInsets(Window window, int background) {
         this.window = window;
         decor = window.getDecorView();
-        // One UI can lay out the IME under its navigation buttons after a fold while
-        // reporting no usable bar geometry. Keep a strip inside the keyboard window.
-        minimumBottom = "samsung".equalsIgnoreCase(Build.MANUFACTURER)
-                ? decor.getResources().getDimensionPixelSize(R.dimen.samsung_keyboard_bottom_clearance)
-                : 0;
         systemNavigation = new KeyboardSystemNavigation(decor);
         surface = new KeyboardWindowBackground(background);
         decor.setBackground(surface);
@@ -62,14 +54,7 @@ public final class KeyboardNavigationInsets
             if (inputView != null) inputView.removeOnAttachStateChangeListener(this);
             inputView = input;
             paddingNeedsLayout = false;
-            if (inputView != null) {
-                inputView.addOnAttachStateChangeListener(this);
-                // A newly created keyboard may be measured before any insets arrive.
-                if (inputView.getPaddingBottom() < minimumBottom) {
-                    applyPadding(Insets.of(inputView.getPaddingLeft(), 0,
-                            inputView.getPaddingRight(), minimumBottom));
-                }
-            }
+            if (inputView != null) inputView.addOnAttachStateChangeListener(this);
         }
         surface.setColor(background);
         // Reuse the current insets immediately; requesting a future callback alone leaves a
@@ -105,20 +90,17 @@ public final class KeyboardNavigationInsets
     public WindowInsets onApplyWindowInsets(View view, WindowInsets insets) {
         metricsNeedRefresh = true;
         lastInsets = insets;
-        Insets reported = read(insets);
-        surface.updateInsets(withMinimumBottom(reported));
+        surface.updateInsets(read(insets));
         WindowInsets remaining = view.onApplyWindowInsets(insets);
         lastRemainingInsets = remaining;
         recordLayout("insets-before-padding");
         if (inputView == null) return remaining;
-        Insets navigation = read(remaining);
-        int consumedBottom = Math.max(0, reported.bottom - navigation.bottom);
-        applyPadding(Insets.of(navigation.left, 0, navigation.right,
-                Math.max(navigation.bottom, minimumBottom - consumedBottom)));
-        // Dispatch only the insets Android supplied. The extra space belongs to the keyboard.
-        if (navigation.equals(Insets.NONE)) return remaining;
+        Insets bars = readBars(remaining);
+        applyPadding(withBottom(bars, readBottomControls(remaining)));
+        // Keep the separate controls geometry available to the framework navigation view.
+        if (bars.equals(Insets.NONE)) return remaining;
         if (Build.VERSION.SDK_INT >= 29) {
-            return remaining.inset(navigation.left, 0, navigation.right, navigation.bottom);
+            return remaining.inset(bars.left, 0, bars.right, bars.bottom);
         }
         return remaining.replaceSystemWindowInsets(0, remaining.getSystemWindowInsetTop(), 0, 0);
     }
@@ -156,14 +138,13 @@ public final class KeyboardNavigationInsets
         paddingNeedsLayout = false;
         WindowInsets insets = currentInsets();
         Insets navigation = insets == null ? Insets.NONE : read(insets);
-        if (Build.VERSION.SDK_INT >= 30
-                && (navigation.equals(Insets.NONE) || navigation.bottom < minimumBottom)) {
+        if (Build.VERSION.SDK_INT >= 30 && navigation.bottom == 0) {
             navigation = Insets.max(navigation, readWindowNavigation(insets));
         }
         decor.getLocationInWindow(decorPosition);
         inputView.getLocationInWindow(inputPosition);
-        navigation = withMinimumBottom(Insets.max(navigation,
-                systemNavigation.readRendered((ViewGroup) decor, inputView)));
+        navigation = Insets.max(navigation,
+                systemNavigation.readRendered((ViewGroup) decor, inputView));
         surface.updateInsets(navigation);
         // Verify the space actually reserved by ancestors, rather than assuming that a
         // consumed inset still corresponds to a margin after a window transition.
@@ -190,11 +171,6 @@ public final class KeyboardNavigationInsets
                         Math.max(0, navigation.bottom - bottomGap)));
     }
 
-    private Insets withMinimumBottom(Insets navigation) {
-        if (navigation.bottom >= minimumBottom) return navigation;
-        return Insets.of(navigation.left, 0, navigation.right, minimumBottom);
-    }
-
     @RequiresApi(30)
     private Insets readWindowNavigation(WindowInsets rootInsets) {
         // A display transition can leave the IME ViewRoot with empty bar sources even
@@ -208,9 +184,11 @@ public final class KeyboardNavigationInsets
             try {
                 WindowMetrics metrics = window.getWindowManager().getCurrentWindowMetrics();
                 metricsBounds.set(metrics.getBounds());
-                // Caption bars belong to this IME's ViewRoot, not the metrics' outer window.
-                metricsNavigation = readVisibleType(
-                        metrics.getWindowInsets(), WindowInsets.Type.navigationBars());
+                WindowInsets metricsInsets = metrics.getWindowInsets();
+                android.graphics.Insets bars =
+                        metricsInsets.getInsets(WindowInsets.Type.navigationBars());
+                metricsNavigation = withBottom(Insets.of(bars.left, 0, bars.right, bars.bottom),
+                        readBottomControls(metricsInsets));
             } catch (RuntimeException unavailable) {
                 // Some window contexts cannot supply metrics while switching displays.
                 // Keep using delivered insets and retry after the next layout/show event.
@@ -305,6 +283,15 @@ public final class KeyboardNavigationInsets
     }
 
     private static Insets read(WindowInsets insets) {
+        return withBottom(readBars(insets), readBottomControls(insets));
+    }
+
+    private static Insets withBottom(Insets insets, int bottom) {
+        if (bottom <= insets.bottom) return insets;
+        return Insets.of(insets.left, 0, insets.right, bottom);
+    }
+
+    private static Insets readBars(WindowInsets insets) {
         if (Build.VERSION.SDK_INT >= 30) {
             return Insets.max(
                     readVisibleType(insets, WindowInsets.Type.navigationBars()),
@@ -315,6 +302,35 @@ public final class KeyboardNavigationInsets
                 0,
                 insets.getSystemWindowInsetRight(),
                 insets.getSystemWindowInsetBottom());
+    }
+
+    private static int readBottomControls(WindowInsets insets) {
+        // SystemUI can report a touch-blocking button strip even when the navigation
+        // bar inset is empty. Gesture-only and hidden regions do not supply this inset.
+        int bottom = 0;
+        if (Build.VERSION.SDK_INT >= 30) {
+            bottom = insets.getInsets(WindowInsets.Type.tappableElement()).bottom;
+        } else if (Build.VERSION.SDK_INT == 29) {
+            bottom = insets.getTappableElementInsets().bottom;
+        }
+        if (Build.VERSION.SDK_INT >= 35) {
+            bottom = Math.max(bottom, readBottomControlBounds(insets));
+        }
+        return bottom;
+    }
+
+    @RequiresApi(35)
+    private static int readBottomControlBounds(WindowInsets insets) {
+        int height = insets.getFrame().getHeight();
+        int types = WindowInsets.Type.navigationBars() | WindowInsets.Type.tappableElement();
+        int bottom = 0;
+        // A partial-width bar may be represented by rectangles without an edge inset.
+        for (Rect bounds : insets.getBoundingRects(types)) {
+            if (!bounds.isEmpty() && bounds.bottom == height && bounds.top > 0) {
+                bottom = Math.max(bottom, bounds.height());
+            }
+        }
+        return bottom;
     }
 
     @RequiresApi(30)

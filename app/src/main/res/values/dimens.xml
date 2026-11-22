@@ -17,7 +17,6 @@
 <resources>
     <dimen name="key_height">50dip</dimen>
     <dimen name="key_height_landscape">34dip</dimen>
-    <dimen name="samsung_keyboard_bottom_clearance">64dp</dimen>
     <dimen name="key_preview_text_size">15pt</dimen>
     <dimen name="key_preview_offset">15dp</dimen>
     <dimen name="candidate_font_size">20sp</dimen>
