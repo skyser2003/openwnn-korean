@@ -6,9 +6,7 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.view.WindowInsets;
 
-import androidx.annotation.RequiresApi;
 import androidx.core.graphics.Insets;
 
 /** Draws behind transparent system navigation without covering the app above the keyboard. */
@@ -27,11 +25,6 @@ final class KeyboardWindowBackground extends Drawable {
             paint.setColor(color);
             invalidateSelf();
         }
-    }
-
-    @RequiresApi(21)
-    void updateInsets(WindowInsets insets) {
-        updateInsets(KeyboardNavigationInsets.read(insets));
     }
 
     void updateInsets(Insets navigation) {

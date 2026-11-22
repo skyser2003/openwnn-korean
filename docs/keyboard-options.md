@@ -13,9 +13,7 @@ strip, and bottom navigation area match the selected keyboard theme. Navigation
 icons also change contrast; Android versions before 8.0 retain a black navigation
 bar because they cannot show dark navigation icons.
 The keys sit above Android's navigation controls. Spacing follows the current
-navigation/caption bar inset (including gesture mode and landscape side bars),
-and disappears when no bar space is needed. Space already reserved by Android
-is not added a second time.
+navigation/caption bar inset (including gesture mode and landscape side bars).
 Navigation spacing is restored from the available window insets when the input
 view is attached, replaced, or reopened. After layout, the keyboard checks how
 much space its ancestors actually reserve and adds only the missing amount.
@@ -26,17 +24,11 @@ A visible navigation/caption bar with temporarily empty insets uses its stable
 size on Android 11 and later; genuinely hidden bars do not keep that space.
 If the keyboard window temporarily loses all bar insets during a fold/display
 transition, Android 11 and later also check the current window-manager navigation
-metrics. Only the bar area overlapping the actual keyboard window is reserved,
-so windows already fitted above navigation do not get a second gap. This fallback
-is refreshed on layout, inset delivery, and reopening rather than retaining the
-previous display's bar size.
-The keyboard also measures Android's visible IME navigation frame so its buttons
-cannot overlap keys when both inset sources are missing. On Samsung devices with
-button navigation enabled, it additionally reserves the system-configured button
-bar size even if One UI reports that bar hidden or too small after folding. This
-uses the current display's Android resources, not a fixed pixel height. Samsung's
-gesture-navigation setting disables that button-bar fallback; space already
-provided outside the keyboard window or by ancestors is counted once.
+metrics and the visible IME navigation frame. On Samsung devices, the keyboard
+keeps at least 64 dp of space below the keys inside its window, including with
+gesture navigation or when One UI reports zero bar space after folding. A larger
+reported bar takes precedence. Space already present inside the window counts
+toward this minimum.
 
 Under **Hardware keyboard**:
 
@@ -128,10 +120,9 @@ reset with empty root insets: folding while visible, opening after folding,
 repeated fold/unfold cycles, and a tap at the bottom edge of the space key. They
 also cover metrics recovery, gesture/side/hidden navigation, and space already
 reserved by either the window manager or an ancestor.
-Samsung regressions also cover both inset sources reporting empty/hidden, a
-visible framework navigation frame with no reported inset, undersized insets,
-switching between button and gesture navigation, and a bottom-edge space-key tap
-with every reported bar inset zero.
+Samsung regressions cover the minimum clearance before layout and after folding,
+including when One UI reports gesture mode and no bar geometry. They check
+bottom-edge space-key taps, larger bars, and spacing supplied by a parent view.
 
 Device checks still needed for app-specific behavior:
 
