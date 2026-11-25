@@ -65,6 +65,9 @@ jobs:
           fi
 
       - name: Test
+        env:
+          # Robolectric downloads Android framework test images outside Gradle's resolver.
+          JAVA_TOOL_OPTIONS: -Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2
         run: |
           python3 -m unittest discover -s scripts/tests -v
           ./gradlew :app:testDebugUnitTest --no-daemon
