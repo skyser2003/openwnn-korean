@@ -3,10 +3,10 @@ package me.blog.hgl1002.openwnn.view;
 import android.graphics.Rect;
 import android.os.Build;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.view.WindowMetrics;
 
 import androidx.annotation.RequiresApi;
@@ -31,6 +31,8 @@ public final class KeyboardNavigationInsets
     private WindowInsets metricsRootInsets;
     private boolean metricsNeedRefresh = true;
     private final KeyboardSystemNavigation systemNavigation;
+    private final WindowFitting windowFitting;
+    private boolean fitsExternalNavigation;
     private View inputView;
     private WindowInsets lastInsets;
     private WindowInsets lastRemainingInsets;
@@ -42,6 +44,10 @@ public final class KeyboardNavigationInsets
         this.window = window;
         decor = window.getDecorView();
         systemNavigation = new KeyboardSystemNavigation(decor);
+        windowFitting =
+                Build.VERSION.SDK_INT >= 30 && "samsung".equalsIgnoreCase(Build.MANUFACTURER)
+                        ? new WindowFitting(window)
+                        : null;
         surface = new KeyboardWindowBackground(background);
         decor.setBackground(surface);
         decor.setOnApplyWindowInsetsListener(this);
@@ -65,6 +71,7 @@ public final class KeyboardNavigationInsets
 
     private void refresh() {
         if (closed) return;
+        updateWindowFitting(systemNavigation.findFrame(decor, inputView));
         metricsNeedRefresh = true;
         WindowInsets insets = currentInsets();
         if (insets != null) decor.dispatchApplyWindowInsets(insets);
@@ -96,7 +103,11 @@ public final class KeyboardNavigationInsets
         recordLayout("insets-before-padding");
         if (inputView == null) return remaining;
         Insets bars = readBars(remaining);
-        applyPadding(withBottom(bars, readBottomControls(remaining)));
+        Insets navigation = withBottom(bars, readBottomControls(remaining));
+        if (Build.VERSION.SDK_INT >= 30 && fitsExternalNavigation && decor.isLaidOut()) {
+            navigation = clipFittedBottom(navigation, readWindowNavigation(insets), remaining);
+        }
+        applyPadding(navigation);
         // Keep the separate controls geometry available to the framework navigation view.
         if (bars.equals(Insets.NONE)) return remaining;
         if (Build.VERSION.SDK_INT >= 29) {
@@ -135,16 +146,18 @@ public final class KeyboardNavigationInsets
                 || decor.getHeight() == 0
                 || inputView.getWidth() == 0
                 || inputView.getHeight() == 0) return false;
+        View navigationFrame = systemNavigation.findFrame(decor, inputView);
+        updateWindowFitting(navigationFrame);
         paddingNeedsLayout = false;
         WindowInsets insets = currentInsets();
         Insets navigation = insets == null ? Insets.NONE : read(insets);
-        if (Build.VERSION.SDK_INT >= 30 && navigation.bottom == 0) {
-            navigation = Insets.max(navigation, readWindowNavigation(insets));
+        if (Build.VERSION.SDK_INT >= 30 && (navigation.bottom == 0 || fitsExternalNavigation)) {
+            Insets overlap = readWindowNavigation(insets);
+            navigation = clipFittedBottom(Insets.max(navigation, overlap), overlap, insets);
         }
         decor.getLocationInWindow(decorPosition);
         inputView.getLocationInWindow(inputPosition);
-        navigation = Insets.max(navigation,
-                systemNavigation.readRendered((ViewGroup) decor, inputView));
+        navigation = Insets.max(navigation, systemNavigation.readRendered(navigationFrame));
         surface.updateInsets(navigation);
         // Verify the space actually reserved by ancestors, rather than assuming that a
         // consumed inset still corresponds to a margin after a window transition.
@@ -214,6 +227,27 @@ public final class KeyboardNavigationInsets
                         Math.max(0, bottom - metricsBounds.bottom + metricsNavigation.bottom)));
     }
 
+    @RequiresApi(30)
+    private Insets clipFittedBottom(Insets navigation, Insets overlap, WindowInsets rootInsets) {
+        // A relocated window can temporarily receive insets calculated for its old frame.
+        // When the metrics still describe a visible bar on this display, count only the
+        // part overlapping the window. In-window caption space remains independent.
+        int left = screenPosition[0];
+        int top = screenPosition[1];
+        if (!fitsExternalNavigation
+                || navigation.bottom > metricsNavigation.bottom
+                || overlap.bottom >= navigation.bottom
+                || !metricsBounds.contains(
+                        left, top, left + decor.getWidth(), top + decor.getHeight())) {
+            return navigation;
+        }
+        int caption =
+                rootInsets == null
+                        ? 0
+                        : readVisibleType(rootInsets, WindowInsets.Type.captionBar()).bottom;
+        return Insets.of(navigation.left, 0, navigation.right, Math.max(overlap.bottom, caption));
+    }
+
     private boolean applyPadding(Insets navigation) {
         if (inputView.getPaddingLeft() != navigation.left
                 || inputView.getPaddingRight() != navigation.right
@@ -271,6 +305,9 @@ public final class KeyboardNavigationInsets
         decor.setOnApplyWindowInsetsListener(null);
         decor.removeOnAttachStateChangeListener(this);
         if (inputView != null) inputView.removeOnAttachStateChangeListener(this);
+        if (Build.VERSION.SDK_INT >= 30 && windowFitting != null) {
+            windowFitting.setFitExternalNavigation(false);
+        }
         stopObservingLayout();
         inputView = null;
         lastInsets = null;
@@ -280,6 +317,51 @@ public final class KeyboardNavigationInsets
     private void recordLayout(String event) {
         KeyboardLayoutDiagnostics.record(event, window, inputView, lastInsets,
                 lastRemainingInsets, paddingNeedsLayout);
+    }
+
+    private void updateWindowFitting(View navigationFrame) {
+        if (Build.VERSION.SDK_INT >= 30 && windowFitting != null) {
+            fitsExternalNavigation = navigationFrame == null;
+            windowFitting.setFitExternalNavigation(fitsExternalNavigation);
+        }
+    }
+
+    @RequiresApi(30)
+    private static final class WindowFitting {
+        private final Window window;
+        private final int defaultTypes;
+        private final int defaultSides;
+        private final boolean defaultIgnoringVisibility;
+
+        WindowFitting(Window window) {
+            this.window = window;
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            defaultTypes = attributes.getFitInsetsTypes();
+            defaultSides = attributes.getFitInsetsSides();
+            defaultIgnoringVisibility = attributes.isFitInsetsIgnoringVisibility();
+        }
+
+        void setFitExternalNavigation(boolean fit) {
+            // Samsung's IME window excludes the bottom edge from fitting by default.
+            // Let WindowManager place the window above external controls before the
+            // view receives insets. An IME-owned navigation frame needs the full window.
+            int types = defaultTypes;
+            int sides = defaultSides;
+            if (fit) {
+                types |= WindowInsets.Type.navigationBars() | WindowInsets.Type.tappableElement();
+                sides |= WindowInsets.Side.BOTTOM;
+            }
+            boolean ignoringVisibility = !fit && defaultIgnoringVisibility;
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            if (attributes.getFitInsetsTypes() != types
+                    || attributes.getFitInsetsSides() != sides
+                    || attributes.isFitInsetsIgnoringVisibility() != ignoringVisibility) {
+                attributes.setFitInsetsTypes(types);
+                attributes.setFitInsetsSides(sides);
+                attributes.setFitInsetsIgnoringVisibility(ignoringVisibility);
+                window.setAttributes(attributes);
+            }
+        }
     }
 
     private static Insets read(WindowInsets insets) {

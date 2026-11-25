@@ -4,14 +4,13 @@ import android.content.Context;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.os.Bundle;
-import android.view.ViewGroup;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
-import androidx.core.view.OnApplyWindowInsetsListener;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
@@ -42,16 +41,22 @@ public class SebeolHangulIMEControlPanel extends AppCompatActivity implements Pr
 		getSupportFragmentManager().addOnBackStackChangedListener(() -> {
 			getSupportActionBar().setDisplayHomeAsUpEnabled(getSupportFragmentManager().getBackStackEntryCount() != 0);
 		});
-		ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.frame_layout), (OnApplyWindowInsetsListener) (view, windowInsets) -> {
-			Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-			ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
-			params.topMargin = insets.top;
-			params.bottomMargin = insets.bottom;
-			params.leftMargin = insets.left;
-			params.rightMargin = insets.right;
-			view.setLayoutParams(params);
-			return WindowInsetsCompat.CONSUMED;
-		});
+        View settingsRoot = findViewById(R.id.settings_root);
+        ViewCompat.setOnApplyWindowInsetsListener(
+                settingsRoot,
+                (view, windowInsets) -> {
+                    Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    Insets tappable =
+                            windowInsets.getInsets(WindowInsetsCompat.Type.tappableElement());
+                    // Some system buttons can still intercept taps when the navigation inset is
+                    // empty.
+                    view.setPadding(
+                            bars.left,
+                            bars.top,
+                            bars.right,
+                            Math.max(bars.bottom, tappable.bottom));
+                    return WindowInsetsCompat.CONSUMED;
+                });
 	}
 
 	@Override
@@ -141,15 +146,23 @@ public class SebeolHangulIMEControlPanel extends AppCompatActivity implements Pr
 			setPreferencesFromResource(R.xml.openwnn_pref_ko_about, rootKey);
 			Preference copyLayout = findPreference("copy_keyboard_layout_report");
 			if (copyLayout != null) {
-				copyLayout.setOnPreferenceClickListener(preference -> {
-					ClipboardManager clipboard = (ClipboardManager)
-							requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-					clipboard.setPrimaryClip(ClipData.newPlainText(
-							"OpenWnn keyboard layout report", KeyboardLayoutDiagnostics.report()));
-					Toast.makeText(requireContext(), R.string.keyboard_layout_report_copied,
-							Toast.LENGTH_SHORT).show();
-					return true;
-				});
+                copyLayout.setOnPreferenceClickListener(
+                        preference -> {
+                            ClipboardManager clipboard =
+                                    (ClipboardManager)
+                                            requireContext()
+                                                    .getSystemService(Context.CLIPBOARD_SERVICE);
+                            clipboard.setPrimaryClip(
+                                    ClipData.newPlainText(
+                                            "OpenWnn keyboard layout report",
+                                            KeyboardLayoutDiagnostics.report()));
+                            Toast.makeText(
+                                            requireContext(),
+                                            R.string.keyboard_layout_report_copied,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                            return true;
+                        });
 			}
 		}
 	}

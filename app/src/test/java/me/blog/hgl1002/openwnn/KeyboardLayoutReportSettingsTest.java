@@ -4,6 +4,9 @@ import static org.junit.Assert.*;
 
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.graphics.Insets;
+import android.view.View;
+import android.view.WindowInsets;
 
 import androidx.preference.Preference;
 
@@ -20,6 +23,34 @@ import org.robolectric.annotation.Config;
 @Config(sdk = {21, 28, 35})
 public class KeyboardLayoutReportSettingsTest {
     @Test
+    @Config(sdk = 35)
+    public void settingsContentClearsTappableButtonsWhenNavigationInsetsAreEmpty() {
+        ActivityController<SebeolHangulIMEControlPanel> controller =
+                Robolectric.buildActivity(SebeolHangulIMEControlPanel.class).setup();
+        try {
+            View settingsRoot = controller.get().findViewById(R.id.settings_root);
+            WindowInsets buttons =
+                    new WindowInsets.Builder()
+                            .setInsets(WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, 52))
+                            .setVisible(WindowInsets.Type.tappableElement(), true)
+                            .build();
+            settingsRoot.dispatchApplyWindowInsets(buttons);
+            assertEquals(52, settingsRoot.getPaddingBottom());
+
+            WindowInsets hidden =
+                    new WindowInsets.Builder()
+                            .setInsetsIgnoringVisibility(
+                                    WindowInsets.Type.tappableElement(), Insets.of(0, 0, 0, 52))
+                            .setVisible(WindowInsets.Type.tappableElement(), false)
+                            .build();
+            settingsRoot.dispatchApplyWindowInsets(hidden);
+            assertEquals(0, settingsRoot.getPaddingBottom());
+        } finally {
+            controller.pause().stop().destroy();
+        }
+    }
+
+    @Test
     public void aboutActionCopiesTheLayoutReportOnlyWhenTapped() {
         ActivityController<SebeolHangulIMEControlPanel> controller =
                 Robolectric.buildActivity(SebeolHangulIMEControlPanel.class).setup();
@@ -31,9 +62,11 @@ public class KeyboardLayoutReportSettingsTest {
             Preference copy = about.findPreference("copy_keyboard_layout_report");
             assertNotNull(copy);
             ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
-            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("existing", "keep this clip"));
+            clipboard.setPrimaryClip(
+                    android.content.ClipData.newPlainText("existing", "keep this clip"));
             KeyboardLayoutDiagnostics.report();
-            assertEquals("keep this clip", clipboard.getPrimaryClip().getItemAt(0).getText().toString());
+            assertEquals(
+                    "keep this clip", clipboard.getPrimaryClip().getItemAt(0).getText().toString());
             assertTrue(copy.getOnPreferenceClickListener().onPreferenceClick(copy));
             String report = clipboard.getPrimaryClip().getItemAt(0).getText().toString();
             assertTrue(report.startsWith("OpenWnn keyboard layout report"));

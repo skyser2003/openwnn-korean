@@ -22,6 +22,7 @@ import android.view.Gravity;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
@@ -61,6 +62,7 @@ public class KeyboardFoldNavigationTest {
     private BaseInputConnection connection;
     private int width = 800;
     private int height = 1200;
+    private int fittedBottomInset;
     private String originalManufacturer;
 
     @Before
@@ -159,11 +161,140 @@ public class KeyboardFoldNavigationTest {
 
     @Test
     public void windowAlreadyAboveNavigationDoesNotAddAnotherGap() {
-        // The window manager already shortened the IME window by the bar height.
-        height = 1152;
+        ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
+        foldTo(1200, 1600, 52);
+        // Model WindowManager fitting the window above its external navigation bar.
+        // The IME's root insets are relative to the fitted frame and remain empty.
+        fittedBottomInset = 52;
         dispatchRootInsets(navigation(0));
         layout();
+        assertEquals(0, input.getPaddingBottom());
+        assertKeysAboveBottomBar(52);
+
+        // A late callback can still describe the old, unfitted window.
+        dispatchRootInsets(navigation(52));
+        layout();
+        assertEquals(0, input.getPaddingBottom());
+        assertKeysAboveBottomBar(52);
+
+        fittedBottomInset = 0;
+        MetricsWindowManager.metrics = metrics(width, height, 0);
+        dispatchRootInsets(navigation(0));
+        layout();
+        assertEquals(0, input.getPaddingBottom());
         assertKeysAboveBottomBar(0);
+    }
+
+    @Test
+    public void samsungWindowFitsVisibleBottomNavigationAfterFoldingAndReopening() {
+        ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
+        ime.hideWindow();
+        foldTo(1200, 1600, 0);
+        ime.showWindow(true);
+
+        WindowManager.LayoutParams attributes = ime.getWindow().getWindow().getAttributes();
+        int navigationTypes =
+                WindowInsets.Type.navigationBars() | WindowInsets.Type.tappableElement();
+        assertEquals(navigationTypes, attributes.getFitInsetsTypes() & navigationTypes);
+        assertEquals(
+                WindowInsets.Side.BOTTOM,
+                attributes.getFitInsetsSides() & WindowInsets.Side.BOTTOM);
+        assertFalse(attributes.isFitInsetsIgnoringVisibility());
+    }
+
+    @Test
+    @Config(sdk = 35)
+    public void platformFitsCurrentNavigationBeforeTheImeReceivesInsets() throws Exception {
+        ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
+        foldTo(1200, 1600, 0);
+        assertEquals(
+                0,
+                decor.getRootWindowInsets().getInsets(WindowInsets.Type.navigationBars()).bottom);
+
+        WindowManager.LayoutParams attributes = ime.getWindow().getWindow().getAttributes();
+        Rect display = new Rect(0, 0, width, height);
+        Rect bar = new Rect(0, height - 52, width, height);
+        Class<?> layoutType = Class.forName("android.view.WindowLayout");
+        Class<?> stateType = Class.forName("android.view.InsetsState");
+        Class<?> sourceType = Class.forName("android.view.InsetsSource");
+        Class<?> framesType = Class.forName("android.window.ClientWindowFrames");
+        assertEquals(
+                bar.top,
+                computeWindowBottom(
+                        layoutType,
+                        stateType,
+                        sourceType,
+                        framesType,
+                        attributes,
+                        display,
+                        bar,
+                        true));
+        assertEquals(
+                display.bottom,
+                computeWindowBottom(
+                        layoutType,
+                        stateType,
+                        sourceType,
+                        framesType,
+                        attributes,
+                        display,
+                        bar,
+                        false));
+    }
+
+    private static <Layout, State, Source, Frames> int computeWindowBottom(
+            Class<Layout> layoutType,
+            Class<State> stateType,
+            Class<Source> sourceType,
+            Class<Frames> framesType,
+            WindowManager.LayoutParams attributes,
+            Rect display,
+            Rect bar,
+            boolean visible)
+            throws ReflectiveOperationException {
+        // These are Android 15's framework types. The application itself uses public APIs.
+        Layout layout = layoutType.getConstructor().newInstance();
+        State state = stateType.getConstructor().newInstance();
+        Source source =
+                sourceType
+                        .getConstructor(int.class, int.class)
+                        .newInstance(0, WindowInsets.Type.navigationBars());
+        Frames frames = framesType.getConstructor().newInstance();
+        stateType.getMethod("setDisplayFrame", Rect.class).invoke(state, display);
+        sourceType.getMethod("setFrame", Rect.class).invoke(source, bar);
+        sourceType.getMethod("setVisible", boolean.class).invoke(source, visible);
+        stateType.getMethod("addSource", sourceType).invoke(state, source);
+        int fullscreen =
+                Class.forName("android.app.WindowConfiguration")
+                        .getField("WINDOWING_MODE_FULLSCREEN")
+                        .getInt(null);
+        layoutType
+                .getMethod(
+                        "computeFrames",
+                        WindowManager.LayoutParams.class,
+                        stateType,
+                        Rect.class,
+                        Rect.class,
+                        int.class,
+                        int.class,
+                        int.class,
+                        int.class,
+                        float.class,
+                        framesType)
+                .invoke(
+                        layout,
+                        attributes,
+                        state,
+                        display,
+                        display,
+                        fullscreen,
+                        display.width(),
+                        200,
+                        WindowInsets.Type.navigationBars(),
+                        1f,
+                        frames);
+        Rect frame = (Rect) framesType.getField("frame").get(frames);
+        return frame.bottom;
     }
 
     @Test
@@ -254,17 +385,41 @@ public class KeyboardFoldNavigationTest {
     @Test
     public void renderedImeNavigationProtectsKeysWhenBothInsetSourcesAreEmpty() throws Exception {
         foldTo(1200, 1600, 0);
-        Class<?> frameClass = Class.forName(
-                "android.inputmethodservice.navigationbar.NavigationBarFrame");
-        View frame = (View) ReflectionHelpers.callConstructor(frameClass,
-                ReflectionHelpers.ClassParameter.from(Context.class, ime));
-        ((ViewGroup) decor).addView(frame, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 64, Gravity.BOTTOM));
+        View frame = attachImeNavigationFrame(64);
         layout();
         assertKeysAboveBottomBar(64);
         frame.setVisibility(View.GONE);
         layout();
         assertKeysAboveBottomBar(0);
+    }
+
+    @Test
+    public void samsungImeOwnedNavigationStaysInsideTheWindow() throws Exception {
+        ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
+        ime.hideWindow();
+        foldTo(1200, 1600, 0);
+        attachImeNavigationFrame(52);
+        ime.showWindow(true);
+        layout();
+
+        WindowManager.LayoutParams attributes = ime.getWindow().getWindow().getAttributes();
+        assertEquals(0, attributes.getFitInsetsSides() & WindowInsets.Side.BOTTOM);
+        assertKeysAboveBottomBar(52);
+    }
+
+    private View attachImeNavigationFrame(int frameHeight) throws ReflectiveOperationException {
+        Class<? extends View> frameClass =
+                Class.forName("android.inputmethodservice.navigationbar.NavigationBarFrame")
+                        .asSubclass(View.class);
+        View frame =
+                ReflectionHelpers.callConstructor(
+                        frameClass, ReflectionHelpers.ClassParameter.from(Context.class, ime));
+        ((ViewGroup) decor)
+                .addView(
+                        frame,
+                        new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, frameHeight, Gravity.BOTTOM));
+        return frame;
     }
 
     @Test
@@ -379,8 +534,10 @@ public class KeyboardFoldNavigationTest {
                     View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST));
             decor.layout(0, 0, width, decor.getMeasuredHeight());
             // Position the wrap-content IME window at the screen bottom as WindowManager does.
-            Object attachInfo = ReflectionHelpers.getField(decor, "mAttachInfo");
-            ReflectionHelpers.setField(attachInfo, "mWindowTop", height - decor.getHeight());
+            ReflectionHelpers.setField(
+                    ReflectionHelpers.getField(decor, "mAttachInfo"),
+                    "mWindowTop",
+                    height - fittedBottomInset - decor.getHeight());
             decor.getViewTreeObserver().dispatchOnGlobalLayout();
         }
         assertFalse("Drawing must resume once the keys are safely laid out",
