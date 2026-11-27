@@ -7,7 +7,6 @@ import android.content.res.Resources;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
-import android.os.Looper;
 import android.os.SystemClock;
 import android.text.InputType;
 import android.view.MotionEvent;
@@ -24,10 +23,10 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
 import org.robolectric.android.controller.ServiceController;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadows.ShadowLooper;
 
 import java.time.Duration;
 
@@ -157,6 +156,6 @@ public class SoftwareKeyboardTouchTest {
     }
 
     private static void idle(long milliseconds) {
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(milliseconds));
+        ShadowLooper.shadowMainLooper().idleFor(Duration.ofMillis(milliseconds));
     }
 }

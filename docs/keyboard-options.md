@@ -82,7 +82,7 @@ diagnostic and does not change navigation spacing.
 
 ## Building and testing
 
-Use JDK 17, Android SDK platform 36, and build-tools 35.0.0. Set `JAVA_HOME` and
+Use JDK 21, Android SDK platform 37.0, and build-tools 37.0.0. Set `JAVA_HOME` and
 `ANDROID_HOME` for the installed tools, and apply any local `.env`/`.envrc` before
 running Gradle.
 

@@ -640,6 +640,10 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 				keyList[KEYBOARD_SHIFT_OFF][KEYMODE_HANGUL][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_dubul_danmoeum_google);
 				break;
 
+			case "keyboard_dubul_danmoeum_dujule":
+				loadDujuleDanmoeum(keyList, KEYMODE_HANGUL);
+				break;
+
 			case "keyboard_12key_sebul_munhwa":
 			case "keyboard_12key_sebul_munhwa_predictive":
 				keyList[KEYBOARD_SHIFT_OFF][KEYMODE_HANGUL][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_12key_sebul_munhwa);
@@ -1253,6 +1257,21 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 
 	protected void loadSoftLayout(Keyboard[][][] keyList, int keyMode, String softLayout) {
 		switch(softLayout) {
+		case "l0.9":
+			keyList[KEYBOARD_SHIFT_OFF][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l0_9_9cols);
+			keyList[KEYBOARD_SHIFT_ON][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l0_9_9cols);
+			break;
+
+		case "l0.9.1":
+		case "l3.0": // Existing preferences may still use the old layout ID.
+			keyList[KEYBOARD_SHIFT_OFF][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l0_9_1_9cols_num);
+			keyList[KEYBOARD_SHIFT_ON][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l0_9_1_9cols_num);
+			break;
+
+		case "l4.0":
+			loadDujuleDanmoeum(keyList, keyMode);
+			break;
+
 		case "l1.0":
 			keyList[KEYBOARD_SHIFT_OFF][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l1_0_mobile);
 			keyList[KEYBOARD_SHIFT_ON][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l1_0_mobile);
@@ -1293,22 +1312,19 @@ public class DefaultSoftKeyboard extends me.blog.hgl1002.openwnn.DefaultSoftKeyb
 			keyList[KEYBOARD_SHIFT_ON][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l2_0_11cols);
 			break;
 
-		case "l3.0":
-			keyList[KEYBOARD_SHIFT_OFF][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l3_0_9cols);
-			keyList[KEYBOARD_SHIFT_ON][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l3_0_9cols);
-			break;
-
-		case "l4.0":
-			keyList[KEYBOARD_SHIFT_OFF][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l4_0_8cols);
-			keyList[KEYBOARD_SHIFT_ON][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_l4_0_8cols);
-			break;
-
 		case "pc1":
 			keyList[KEYBOARD_SHIFT_OFF][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_pc1_alphanumeric);
 			keyList[KEYBOARD_SHIFT_ON][keyMode][0] = loadKeyboardLayout(mIME, R.xml.keyboard_ko_pc1_alphanumeric);
 			break;
 
 		}
+	}
+
+	private void loadDujuleDanmoeum(Keyboard[][][] keyList, int keyMode) {
+		keyList[KEYBOARD_SHIFT_OFF][keyMode][0] =
+				loadKeyboardLayout(mIME, R.xml.keyboard_ko_dubul_danmoeum_dujule);
+		keyList[KEYBOARD_SHIFT_ON][keyMode][0] =
+				loadKeyboardLayout(mIME, R.xml.keyboard_ko_dubul_danmoeum_dujule_shift);
 	}
 
 	@SuppressWarnings("deprecation")

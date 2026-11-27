@@ -3,7 +3,6 @@ package me.blog.hgl1002.openwnn;
 import static org.junit.Assert.*;
 
 import android.content.SharedPreferences;
-import android.os.Looper;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 
@@ -14,9 +13,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadows.ShadowLooper;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -296,7 +295,7 @@ public class HardwareKeyHandlerTest {
     }
 
     private static void advance(int milliseconds) {
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(milliseconds));
+        ShadowLooper.shadowMainLooper().idleFor(Duration.ofMillis(milliseconds));
     }
 
     private static final class RecordingListener implements HardwareKeyHandler.Listener {

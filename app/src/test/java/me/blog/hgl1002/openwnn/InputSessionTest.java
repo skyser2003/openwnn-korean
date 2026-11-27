@@ -8,7 +8,6 @@ import android.content.res.Resources;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
-import android.os.Looper;
 import android.os.SystemClock;
 import android.text.InputType;
 import android.view.InputDevice;
@@ -30,10 +29,10 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
 import org.robolectric.android.controller.ServiceController;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadows.ShadowLooper;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -127,10 +126,10 @@ public class InputSessionTest {
                         "system_action_on_lang_key_long_press",
                         SebeolHangulIME.LANGKEY_SWITCH_KOR_ENG)
                 .apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         KeyEvent down = key(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, KeyEvent.META_CTRL_ON);
         assertTrue(ime.onKeyDown(down.getKeyCode(), down));
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600));
+        ShadowLooper.shadowMainLooper().idleFor(Duration.ofMillis(600));
         KeyEvent up = key(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE, KeyEvent.META_CTRL_ON);
         assertTrue(ime.onKeyUp(up.getKeyCode(), up));
         press(KeyEvent.KEYCODE_R, 0);
@@ -147,9 +146,30 @@ public class InputSessionTest {
     }
 
     @Test
+    public void savedKoreanLayoutsStillLoadAfterTheUpstreamRenames() {
+        preferences
+                .edit()
+                .putBoolean("hardware_hide_keyboard", false)
+                .putString("hardware_hangul_layout", "keyboard_sebul_semoe")
+                .putString("keyboard_hangul_soft_layout_portrait", "l3.0")
+                .apply();
+        ShadowLooper.shadowMainLooper().idle();
+        press(KeyEvent.KEYCODE_SPACE, KeyEvent.META_SHIFT_ON);
+        assertEquals('1', fullSoftwareKeyboard().getKeyboard().getKeys().get(0).codes[0]);
+
+        preferences
+                .edit()
+                .putString("hardware_hangul_layout", "keyboard_dubul_danmoeum_dujule")
+                .putString("keyboard_hangul_soft_layout_portrait", "l4.0")
+                .apply();
+        ShadowLooper.shadowMainLooper().idle();
+        assertEquals('1', fullSoftwareKeyboard().getKeyboard().getKeys().get(0).codes[0]);
+    }
+
+    @Test
     public void disablingHideOptionTakesEffectWithoutRestart() {
         preferences.edit().putBoolean("hardware_hide_keyboard", false).apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         assertTrue(ime.onEvaluateInputViewShown());
         assertTrue(ime.hasHardwareKeyboard());
         KeyboardView keyboard = fullSoftwareKeyboard();
@@ -159,7 +179,7 @@ public class InputSessionTest {
         press(KeyEvent.KEYCODE_G, 0);
         assertEquals("ad", connection.getEditable().toString());
         preferences.edit().putBoolean("hardware_hide_keyboard", true).apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         assertFalse(ime.onEvaluateInputViewShown());
         assertFalse(ime.onShowInputRequested(InputMethod.SHOW_EXPLICIT, false));
     }
@@ -188,7 +208,7 @@ public class InputSessionTest {
     @Config(sdk = {28, 33, 35})
     public void uncheckedOptionKeepsKeysAcrossHardwareConnectionChanges() {
         preferences.edit().putBoolean("hardware_hide_keyboard", false).apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         for (boolean connected : new boolean[] {false, true, false, true}) {
             ime.onConfigurationChanged(configureHardware(connected));
             // Resume the editor under the new configuration, as during an IME restart.
@@ -202,14 +222,14 @@ public class InputSessionTest {
     @Test
     public void interfaceLanguageChangesWithoutChangingHardwareTypingLayout() {
         AppLanguage.select(ime, "ko");
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         assertEquals("앱 언어", ime.getString(R.string.preference_app_language_title));
         assertTrue(ime.hasHardwareKeyboard());
         assertFalse(ime.onEvaluateInputViewShown());
         press(KeyEvent.KEYCODE_G, 0);
         assertEquals("d", connection.getEditable().toString());
         AppLanguage.select(ime, "en");
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         assertEquals("App language", ime.getString(R.string.preference_app_language_title));
     }
 
@@ -253,7 +273,7 @@ public class InputSessionTest {
                 .edit()
                 .putString("hardware_alphabet_layout", "keyboard_alphabet_dvorak")
                 .apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         RecordingConnection canvas = startCanvas();
         press(KeyEvent.KEYCODE_Q, KeyEvent.META_SHIFT_ON);
         assertEquals(0, canvas.textCommits);
@@ -355,7 +375,7 @@ public class InputSessionTest {
 
     private void selectNonTextLayout(String layout) {
         preferences.edit().putString("hardware_shortcut_layout", layout).apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
     }
 
     private RecordingConnection startCanvas() {

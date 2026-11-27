@@ -12,7 +12,6 @@ import android.inputmethodservice.KeyboardView;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.SystemClock;
 import android.text.InputType;
 import android.util.DisplayMetrics;
@@ -38,13 +37,14 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
 import org.robolectric.android.controller.ServiceController;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadow.api.Shadow;
 import org.robolectric.shadows.ShadowDisplay;
+import org.robolectric.shadows.ShadowLooper;
 import org.robolectric.shadows.ShadowWindowManagerImpl;
 import org.robolectric.util.ReflectionHelpers;
 
@@ -94,7 +94,7 @@ public class KeyboardFoldNavigationTest {
         Window window = ime.getWindow().getWindow();
         window.setDecorFitsSystemWindows(false);
         ime.showWindow(true);
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         decor = window.getDecorView();
         input = (ViewGroup) ime.onCreateInputView();
         assertTrue(input.isAttachedToWindow());
@@ -500,7 +500,7 @@ public class KeyboardFoldNavigationTest {
         View oldInput = input;
         width = newWidth;
         height = newHeight;
-        ShadowDisplay displayState = Shadows.shadowOf(
+        ShadowDisplay displayState = Shadow.extract(
                 ime.getWindow().getWindow().getWindowManager().getDefaultDisplay());
         displayState.setWidth(width);
         displayState.setHeight(height);

@@ -2,6 +2,9 @@ package me.blog.hgl1002.openwnn.hangul;
 
 import java.util.EmptyStackException;
 import java.util.Stack;
+import android.util.SparseArray;
+
+import static me.blog.hgl1002.openwnn.hangul.Abbreviation.getAbbreviation;
 
 /**
  * 한글 엔진 클래스. (버전 1, OpenWnn)
@@ -171,6 +174,8 @@ public class HangulEngine {
 	 * 한글 낱자를 어떻게 조합할지 정의한다. (예: 0x1100 + 0x1100 = 0x1101, ㄱ+ㄱ=ㄲ)
 	 */
     private int[][] combinationTable;
+
+	private SparseArray<String> abbreviations;
 
 	public HangulEngine() {
 		// 한글 조합 상태를 초기화한다.
@@ -463,7 +468,7 @@ public class HangulEngine {
 		}
 
 		// 화면에 표시되는 문자를 계산해서 표시를 요청한다.
-		this.composing = getVisible(this.cho, this.jung, this.jong);
+		this.composing = getComposingText();
 		if(listener != null) listener.onEvent(new SetComposingEvent(composing));
 
 		lastInputType = result;
@@ -702,6 +707,59 @@ public class HangulEngine {
 
 	public void setCombinationTable(int[][] combinations) {
 		this.combinationTable = combinations;
+	}
+
+	public void setAbbreviations(
+			SparseArray<String> abbreviations
+	) {
+		this.abbreviations = abbreviations;
+	}
+
+	private String getCurrentAbbreviation() {
+		if (abbreviations == null) {
+			return null;
+		}
+
+		if (cho == -1) {
+			return null;
+		}
+
+		int choCode = cho + 0x1100;
+
+		int jungCode;
+		if (jung == -1) {
+			jungCode = 0x1160;
+		} else {
+			jungCode = jung + 0x1161;
+		}
+
+		int jongCode;
+		if (jong == -1) {
+			jongCode = 0;
+		} else {
+			jongCode = jong + 0x11a7;
+		}
+
+		return getAbbreviation(
+				abbreviations,
+				choCode,
+				jungCode,
+				jongCode
+		);
+	}
+
+	private String getComposingText() {
+		String abbreviation = getCurrentAbbreviation();
+
+		if (abbreviation != null) {
+			return abbreviation;
+		}
+
+		return getVisible(
+				this.cho,
+				this.jung,
+				this.jong
+		);
 	}
 
 	/**

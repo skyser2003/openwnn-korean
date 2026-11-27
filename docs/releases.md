@@ -3,8 +3,8 @@
 Every push to `release` runs the Android unit tests, builds a release APK, verifies
 its signature, and publishes it with a SHA-256 checksum in GitHub Releases. The
 same files are also saved as a workflow artifact for 30 days. Tags point to the
-commit that was built. Builds use Java 17, Android platform 36, and build-tools
-35.0.0.
+commit that was built. Builds use Java 21, Android platform 37.0, and build-tools
+37.0.0.
 
 ## Signing setup
 

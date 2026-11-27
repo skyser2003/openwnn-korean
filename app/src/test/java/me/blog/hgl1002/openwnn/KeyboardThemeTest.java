@@ -11,7 +11,6 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.os.Looper;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -31,11 +30,11 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
 import org.robolectric.android.controller.ServiceController;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.GraphicsMode;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadows.ShadowLooper;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {21, 28, 33, 35})
@@ -87,7 +86,7 @@ public class KeyboardThemeTest {
     public void explicitSkinsOverrideSystemAndRefreshWithoutRestart() {
         for (KeyboardTheme theme : KeyboardTheme.values()) {
             preferences.edit().putString("keyboard_skin", theme.getSkinId()).apply();
-            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            ShadowLooper.shadowMainLooper().idle();
             assertSurfaces(theme);
             ime.onConfigurationChanged(updateConfiguration(true, false));
             assertSurfaces(theme);
@@ -95,7 +94,7 @@ public class KeyboardThemeTest {
             assertSurfaces(theme);
         }
         preferences.edit().putString("keyboard_skin", "system").apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         ime.onConfigurationChanged(updateConfiguration(true, false));
         assertSurfaces(KeyboardTheme.DARK);
     }
@@ -107,7 +106,7 @@ public class KeyboardThemeTest {
                 .putString("keyboard_skin", "dark")
                 .putBoolean("initial_launch", true)
                 .apply();
-        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        ShadowLooper.shadowMainLooper().idle();
         ime.onConfigurationChanged(updateConfiguration(false, true));
         View input = ime.onCreateInputView();
         View indicators = input.findViewById(R.id.subview);

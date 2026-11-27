@@ -445,6 +445,7 @@ public class SebeolHangulIME extends InputMethodService
 			mHangulEngine = mQwertyEngine;
 			mHangulEngine.setJamoTable(null);
 			mHangulEngine.setCombinationTable(null);
+			mHangulEngine.setAbbreviations(null);
 			return;
 		}
 
@@ -459,6 +460,7 @@ public class SebeolHangulIME extends InputMethodService
 		if(mode.jamoset != null) mHangulEngine.setJamoSet(mode.jamoset);
 		else mHangulEngine.setJamoTable(mode.layout);
 		mHangulEngine.setCombinationTable(mode.combination);
+		mHangulEngine.setAbbreviations(mode.getAbbreviations());
 		if(prop.twelveEngine) {
 			if(mode.addStroke != null) ((TwelveHangulEngine) m12keyEngine).setAddStrokeTable(mode.addStroke);
 		}
