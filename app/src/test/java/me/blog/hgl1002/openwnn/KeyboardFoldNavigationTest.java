@@ -186,27 +186,31 @@ public class KeyboardFoldNavigationTest {
     }
 
     @Test
-    public void samsungWindowFitsVisibleBottomNavigationAfterFoldingAndReopening() {
+    public void samsungRecoversVisibleNavigationWhenBothTypedSourcesAreEmpty() {
         ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
         ime.hideWindow();
         foldTo(1200, 1600, 0);
+        ShadowDisplay displayState =
+                Shadow.extract(ime.getWindow().getWindow().getWindowManager().getDefaultDisplay());
+        displayState.setHeight(height - 52);
         ime.showWindow(true);
+        layout();
+        assertKeysAboveBottomBar(52);
+        tapBottomEdgeOfSpace(52);
 
-        WindowManager.LayoutParams attributes = ime.getWindow().getWindow().getAttributes();
-        int navigationTypes =
-                WindowInsets.Type.navigationBars() | WindowInsets.Type.tappableElement();
-        assertEquals(navigationTypes, attributes.getFitInsetsTypes() & navigationTypes);
-        assertEquals(
-                WindowInsets.Side.BOTTOM,
-                attributes.getFitInsetsSides() & WindowInsets.Side.BOTTOM);
-        assertFalse(attributes.isFitInsetsIgnoringVisibility());
+        displayState.setHeight(height);
+        layout();
+        assertKeysAboveBottomBar(0);
     }
 
     @Test
     @Config(sdk = 35)
-    public void platformFitsCurrentNavigationBeforeTheImeReceivesInsets() throws Exception {
+    public void samsungWindowClearsNavigationAndReportsEnoughInsetToTheAppAfterFolding()
+            throws Exception {
         ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
-        foldTo(1200, 1600, 0);
+        ime.hideWindow();
+        foldTo(1200, 1600, 52);
+        ime.showWindow(true);
         assertEquals(
                 0,
                 decor.getRootWindowInsets().getInsets(WindowInsets.Type.navigationBars()).bottom);
@@ -218,17 +222,25 @@ public class KeyboardFoldNavigationTest {
         Class<?> stateType = Class.forName("android.view.InsetsState");
         Class<?> sourceType = Class.forName("android.view.InsetsSource");
         Class<?> framesType = Class.forName("android.window.ClientWindowFrames");
-        assertEquals(
-                bar.top,
-                computeWindowBottom(
-                        layoutType,
-                        stateType,
-                        sourceType,
-                        framesType,
-                        attributes,
-                        display,
-                        bar,
-                        true));
+        fittedBottomInset =
+                display.bottom
+                        - computeWindowBottom(
+                                layoutType,
+                                stateType,
+                                sourceType,
+                                framesType,
+                                attributes,
+                                display,
+                                bar,
+                                true);
+        layout();
+        assertAppContentClearsKeyboard(sourceType, display, bar.height());
+        assertKeysAboveBottomBar(52);
+        tapBottomEdgeOfSpace(52);
+
+        fittedBottomInset = 0;
+        MetricsWindowManager.metrics = metrics(width, height, 0);
+        dispatchRootInsets(navigation(0));
         assertEquals(
                 display.bottom,
                 computeWindowBottom(
@@ -240,6 +252,41 @@ public class KeyboardFoldNavigationTest {
                         display,
                         bar,
                         false));
+        layout();
+        assertAppContentClearsKeyboard(sourceType, display, 0);
+        assertKeysAboveBottomBar(0);
+    }
+
+    private <Source> void assertAppContentClearsKeyboard(
+            Class<Source> sourceType, Rect display, int navigationHeight)
+            throws ReflectiveOperationException {
+        InputMethodService.Insets imeInsets = new InputMethodService.Insets();
+        ime.onComputeInsets(imeInsets);
+        int[] position = new int[2];
+        decor.getLocationOnScreen(position);
+        // Android's IME source is the window frame inset by the service's contentTopInsets.
+        Rect sourceFrame =
+                new Rect(
+                        position[0],
+                        position[1] + imeInsets.contentTopInsets,
+                        position[0] + decor.getWidth(),
+                        position[1] + decor.getHeight());
+        Source source =
+                sourceType
+                        .getConstructor(int.class, int.class)
+                        .newInstance(0, WindowInsets.Type.ime());
+        sourceType.getMethod("setVisible", boolean.class).invoke(source, true);
+        sourceType.getMethod("setFrame", Rect.class).invoke(source, sourceFrame);
+        Insets appImeInsets =
+                (Insets)
+                        sourceType
+                                .getMethod("calculateInsets", Rect.class, boolean.class)
+                                .invoke(source, display, false);
+        int appContentBottom = display.bottom - Math.max(appImeInsets.bottom, navigationHeight);
+        View keys = input.findViewById(R.id.keyboard);
+        keys.getLocationOnScreen(position);
+        assertEquals(
+                "App controls must stop at the top of the keyboard", position[1], appContentBottom);
     }
 
     private static <Layout, State, Source, Frames> int computeWindowBottom(
