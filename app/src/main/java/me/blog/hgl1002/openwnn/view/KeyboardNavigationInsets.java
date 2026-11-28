@@ -31,17 +31,23 @@ public final class KeyboardNavigationInsets
     private WindowInsets metricsRootInsets;
     private boolean metricsNeedRefresh = true;
     private final KeyboardSystemNavigation systemNavigation;
+    private final KeyboardNavigationProbe navigationProbe;
     private View inputView;
     private WindowInsets lastInsets;
     private WindowInsets lastRemainingInsets;
     private ViewTreeObserver observedTree;
     private boolean paddingNeedsLayout;
+    private boolean windowVisible;
     private boolean closed;
 
     public KeyboardNavigationInsets(Window window, int background) {
         this.window = window;
         decor = window.getDecorView();
         systemNavigation = new KeyboardSystemNavigation(decor);
+        navigationProbe =
+                Build.VERSION.SDK_INT >= 35 && "samsung".equalsIgnoreCase(Build.MANUFACTURER)
+                        ? new KeyboardNavigationProbe(window)
+                        : null;
         // Keep the framework's bottom-anchored IME window. Android reports its height
         // to edge-to-edge apps as a bottom inset, so moving the whole window up would
         // leave apps underneath the keyboard by the height of the navigation bar.
@@ -64,6 +70,11 @@ public final class KeyboardNavigationInsets
         // reopened or replaced input view unprotected until that callback arrives.
         refresh();
         scheduleRefresh();
+    }
+
+    public void setWindowVisible(boolean visible) {
+        windowVisible = visible;
+        if (!visible) stopProbe();
     }
 
     private void refresh() {
@@ -153,6 +164,9 @@ public final class KeyboardNavigationInsets
         decor.getLocationInWindow(decorPosition);
         inputView.getLocationInWindow(inputPosition);
         navigation = Insets.max(navigation, systemNavigation.readRendered(navigationFrame));
+        if (Build.VERSION.SDK_INT >= 35 && navigationProbe != null && windowVisible) {
+            navigation = withBottom(navigation, navigationProbe.bottomOverlap());
+        }
         surface.updateInsets(navigation);
         // Verify the space actually reserved by ancestors, rather than assuming that a
         // consumed inset still corresponds to a margin after a window transition.
@@ -315,7 +329,10 @@ public final class KeyboardNavigationInsets
     public void onViewDetachedFromWindow(View view) {
         recordLayout("detach");
         decor.removeCallbacks(refreshAfterAttach);
-        if (view == decor) stopObservingLayout();
+        if (view == decor) {
+            stopProbe();
+            stopObservingLayout();
+        }
     }
 
     public void close() {
@@ -325,10 +342,15 @@ public final class KeyboardNavigationInsets
         decor.setOnApplyWindowInsetsListener(null);
         decor.removeOnAttachStateChangeListener(this);
         if (inputView != null) inputView.removeOnAttachStateChangeListener(this);
+        stopProbe();
         stopObservingLayout();
         inputView = null;
         lastInsets = null;
         lastRemainingInsets = null;
+    }
+
+    private void stopProbe() {
+        if (Build.VERSION.SDK_INT >= 35 && navigationProbe != null) navigationProbe.stop();
     }
 
     private void recordLayout(String event) {

@@ -209,7 +209,8 @@ public class KeyboardFoldNavigationTest {
             throws Exception {
         ReflectionHelpers.setStaticField(Build.class, "MANUFACTURER", "samsung");
         ime.hideWindow();
-        foldTo(1200, 1600, 52);
+        // SystemUI still has a bar source even though the IME and metrics report none.
+        foldTo(1200, 1600, 0);
         ime.showWindow(true);
         assertEquals(
                 0,
@@ -234,27 +235,65 @@ public class KeyboardFoldNavigationTest {
                                 bar,
                                 true);
         layout();
-        assertAppContentClearsKeyboard(sourceType, display, bar.height());
-        assertKeysAboveBottomBar(52);
-        tapBottomEdgeOfSpace(52);
+        ShadowLooper.shadowMainLooper().idle();
 
-        fittedBottomInset = 0;
-        MetricsWindowManager.metrics = metrics(width, height, 0);
-        dispatchRootInsets(navigation(0));
+        MetricsWindowManager windowManager =
+                Shadow.extract(ime.getWindow().getWindow().getWindowManager());
+        View probe =
+                windowManager.getViews().stream()
+                        .filter(
+                                view ->
+                                        view != decor
+                                                && view.getLayoutParams()
+                                                        instanceof WindowManager.LayoutParams)
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError("Navigation probe was not added"));
+        assertTrue(probe.isAttachedToWindow());
+        WindowManager.LayoutParams probeAttributes =
+                (WindowManager.LayoutParams) probe.getLayoutParams();
+        assertEquals(0f, probeAttributes.alpha, 0f);
         assertEquals(
-                display.bottom,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                probeAttributes.flags & WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        probe.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(1, View.MeasureSpec.EXACTLY));
+        probe.layout(0, 0, width, probe.getMeasuredHeight());
+        placeWindowAtBottom(
+                probe,
                 computeWindowBottom(
                         layoutType,
                         stateType,
                         sourceType,
                         framesType,
-                        attributes,
+                        probeAttributes,
+                        display,
+                        bar,
+                        true));
+        probe.getViewTreeObserver().dispatchOnPreDraw();
+        layout();
+        assertAppContentClearsKeyboard(sourceType, display, bar.height());
+        assertKeysAboveBottomBar(52);
+        tapBottomEdgeOfSpace(52);
+
+        placeWindowAtBottom(
+                probe,
+                computeWindowBottom(
+                        layoutType,
+                        stateType,
+                        sourceType,
+                        framesType,
+                        probeAttributes,
                         display,
                         bar,
                         false));
+        probe.getViewTreeObserver().dispatchOnPreDraw();
         layout();
         assertAppContentClearsKeyboard(sourceType, display, 0);
         assertKeysAboveBottomBar(0);
+
+        ime.hideWindow();
+        assertFalse(windowManager.getViews().contains(probe));
     }
 
     private <Source> void assertAppContentClearsKeyboard(
@@ -581,14 +620,18 @@ public class KeyboardFoldNavigationTest {
                     View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST));
             decor.layout(0, 0, width, decor.getMeasuredHeight());
             // Position the wrap-content IME window at the screen bottom as WindowManager does.
-            ReflectionHelpers.setField(
-                    ReflectionHelpers.getField(decor, "mAttachInfo"),
-                    "mWindowTop",
-                    height - fittedBottomInset - decor.getHeight());
+            placeWindowAtBottom(decor, height - fittedBottomInset);
             decor.getViewTreeObserver().dispatchOnGlobalLayout();
         }
         assertFalse("Drawing must resume once the keys are safely laid out",
                 decor.getViewTreeObserver().dispatchOnPreDraw());
+    }
+
+    private static void placeWindowAtBottom(View window, int bottom) {
+        ReflectionHelpers.setField(
+                ReflectionHelpers.getField(window, "mAttachInfo"),
+                "mWindowTop",
+                bottom - window.getHeight());
     }
 
     private void assertKeysAboveBottomBar(int bottom) {

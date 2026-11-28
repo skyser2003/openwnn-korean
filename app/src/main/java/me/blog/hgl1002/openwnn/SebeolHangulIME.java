@@ -284,6 +284,17 @@ public class SebeolHangulIME extends InputMethodService
 	public void onWindowShown() {
 		super.onWindowShown();
 		updateNavigationBar();
+		if (Build.VERSION.SDK_INT >= 21 && mNavigationInsets != null) {
+			mNavigationInsets.setWindowVisible(true);
+		}
+	}
+
+	@Override
+	public void onWindowHidden() {
+		super.onWindowHidden();
+		if (Build.VERSION.SDK_INT >= 21 && mNavigationInsets != null) {
+			mNavigationInsets.setWindowVisible(false);
+		}
 	}
 
 	@Override
